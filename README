@@ -1,0 +1,28 @@
+Text-Creolize version 0.010
+
+A practical implementation of the converter to XTHML from WikiCreole 1.0
+and additions.
+
+INSTALLATION
+
+To install this module, run the following commands:
+
+	perl Makefile.PL
+	make
+	make test
+	make install
+
+
+DEPENDENCIES
+
+Test::Base
+Encode
+Digest::MurmurHash
+
+COPYRIGHT AND LICENCE
+
+Copyright (C) 2010, MIZUTANI Tociyuki
+
+This library is free software; you can redistribute it and/or modify
+it under the same terms as Perl itself.
+

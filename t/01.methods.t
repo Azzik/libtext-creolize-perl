@@ -1,0 +1,37 @@
+use strict;
+use warnings;
+use Test::Base tests => 30;
+use Text::Creolize;
+
+can_ok('Text::Creolize', 'new');
+my $tch = Text::Creolize->new;
+isa_ok($tch, 'Text::Creolize');
+can_ok($tch, 'convert');
+can_ok($tch, 'script_name');
+can_ok($tch, 'static_location');
+can_ok($tch, 'link_visitor');
+can_ok($tch, 'plugin_visitor');
+can_ok($tch, 'toc');
+can_ok($tch, 'tocinfo');
+can_ok($tch, 'result');
+can_ok($tch, 'visit_link');
+can_ok($tch, 'visit_image');
+can_ok($tch, 'visit_plugin');
+can_ok($tch, 'put');
+can_ok($tch, 'puts');
+can_ok($tch, 'put_raw');
+can_ok($tch, 'escape_text');
+can_ok($tch, 'escape_xml');
+can_ok($tch, 'escape_uri');
+can_ok($tch, 'escape_name');
+can_ok($tch, 'hash_base36');
+is(ref $tch->convert(q{}), ref $tch, 'convert -> self');
+ok(! ref $tch->result, 'result -> String');
+is(ref $tch->visit_link('link', 'title', $tch), 'HASH', q{visit_link -> Hash});
+is(ref $tch->visit_image('link', 'title', $tch), 'HASH', q{visit_image -> Hash});
+is(ref $tch->visit_plugin('string', $tch), ref $tch, q{visit_plugin -> self});
+ok(! ref $tch->escape_text('string'), q{escape_text -> String});
+ok(! ref $tch->escape_xml('string'), q{escape_xml -> String});
+ok(! ref $tch->escape_uri('string'), q{escape_uri -> String});
+ok(! ref $tch->escape_name('string'), q{escape_name -> String});
+
