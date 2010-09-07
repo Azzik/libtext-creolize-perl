@@ -1,5 +1,9 @@
 Revision history for Text-Creolize
 
+0.012  Tue Sep  7 03:01:05 2010 UTC
+    + t/23.toc.t
+    ! arrange initialization for toc support.
+
 0.011  Mon Sep  6 00:15:50 2010 UTC
     ! FIX: broken stag for placeholder.
     ! in placeholder, not use escape_text but escape_xml.

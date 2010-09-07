@@ -6,8 +6,8 @@ use Encode qw();
 use English qw(-no_match_vars);
 use Digest::MurmurHash;
 
-# $Id: Creolize.pm,v 0.011 2010/09/06 00:16:08Z tociyuki Exp $
-use version; our $VERSION = '0.011';
+# $Id: Creolize.pm,v 0.012 2010/09/07 03:01:05Z tociyuki Exp $
+use version; our $VERSION = '0.012';
 
 my $WTYPE_NULL = 0;
 my $WTYPE_TEXT = 1;
@@ -37,7 +37,6 @@ sub convert {
     chomp $wiki_source;
     $wiki_source .= "\n";
     $self->{prev_wtype} = $WTYPE_NULL;
-    $self->{result} = q{}; # and clear
     $self->{blank} = q{};  # and clear
     $self->_scan($wiki_source);
     if (defined $self->{toc} && @{$self->{tocinfo}} >= $self->{toc}) {
@@ -55,7 +54,9 @@ sub _init {
         markup_visitor => undef,
         script_name => 'http://www.example.net/wiki/',
         static_location => 'http://www.example.net/static/',
+        prev_wtype => $WTYPE_NULL,
         result => q{},
+        blank => q{},
         tocinfo => [],
     );
     my $opt = ref $arg[0] eq 'HASH' && @arg == 1 ? $arg[0] : {@arg};
@@ -794,7 +795,7 @@ Text::Creolize - A practical converter for WikiCreole to XHTML.
 
 =head1 VERSION
 
-0.011
+0.012
 
 =head1 SYNOPSIS
 
