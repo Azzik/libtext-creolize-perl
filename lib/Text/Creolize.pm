@@ -6,7 +6,7 @@ use Encode qw();
 use English qw(-no_match_vars);
 use Digest::MurmurHash;
 
-# $Id: Creolize.pm,v 0.013 2010/09/08 08:33:48Z tociyuki Exp $
+# $Id: Creolize.pm,v 0.013 2010/09/08 14:20:53Z tociyuki Exp $
 use version; our $VERSION = '0.013';
 
 my $WTYPE_NULL = 0;
@@ -49,6 +49,7 @@ sub convert {
         ## no critic qw(Interpolation)
         $self->{result} = "sub{\n"
             . "my(\$v) = \@_;\n"
+            . "use utf8;\n"
             . "my \$t = '';\n"
             . "\$t .= '" . $self->{result} . "';\n"
             . "return \$t;\n"
@@ -322,7 +323,7 @@ sub visit_link {
     return if $link =~ /script:/imosx;
     if ($link !~ m{\A(?:(?:https?|ftps?)://|\#)}mosx) {
         if ($builder->type eq 'perl') {
-            return {defered => 'yes'};
+            return {runtime => 'yes'};
         }
         $link = $builder->script_name . $link;
     }
@@ -744,6 +745,8 @@ sub _insert_plugin {
     return $self;
 }
 
+sub plugin { return q{} }
+
 # links: "[[ url | description ]]"
 sub _insert_bracketed {
     my($self, $data) = @_;
@@ -763,11 +766,18 @@ sub _insert_link {
     my($self, $data, $link, $title) = @_;
     my $visitor = $self->{link_visitor} || $self;
     my $anchor = $visitor->visit_link($link, $title, $self);
-    if ($anchor && $self->type eq 'perl' && $anchor->{defered}) {
-        $self->_insert_perl_link($data, $link, $title, $anchor);
+    if ($anchor && $self->type eq 'perl' && $anchor->{runtime}) {
+        ## no critic qw(Interpolation)
+        my $method = 'anchor({'
+            . q{source=>'} . $self->escape_quote($data) . q{',}
+            . q{word=>'} . $self->escape_quote($link) . q{',}
+            . q{text=>'} . $self->escape_quote($title) . q{'}
+            . '})';
+        $self->put_raw(qq{';\n\$t .= \$v->$method;\n\$t .= '});
     }
     elsif ($anchor && ($anchor->{name} || $anchor->{href})) {
-        $self->_insert_xhtml_link($data, $link, $title, $anchor);
+        $anchor->{text} = exists $anchor->{text} ? $anchor->{text} : $title;
+        $self->put_raw($self->anchor($anchor));
     }
     else {
         $self->put($data);
@@ -775,9 +785,16 @@ sub _insert_link {
     return $self;
 }
 
-sub _insert_xhtml_link {
-    my($self, $data, $link, $title, $anchor) = @_;
+sub anchor {
+    my($self, $anchor) = @_;
+    my $t = q{};
+    if (exists $anchor->{before}) {
+        $t .= $anchor->{before};
+    }
     my $attr = q{};
+    if (my $word = $anchor->{word}) {
+        $anchor->{href} = $self->script_name . $word;
+    }
     if (my $href = $anchor->{href}) {
         $attr .= q{ href="} . $self->escape_uri($href) . q{"};
     }
@@ -785,26 +802,11 @@ sub _insert_xhtml_link {
         next if ! $anchor->{$k};
         $attr .= qq{ $k="} . $self->escape_text($anchor->{$k}) . q{"};
     }
-    if (exists $anchor->{before}) {
-        $self->put_raw($anchor->{before});
-    }
-    $self->put_raw(qq{<a$attr>});
-    $self->put(exists $anchor->{data} ? $anchor->{data} : $title);
-    $self->put_raw(q{</a>});
+    $t .= qq{<a$attr>} . $self->escape_text($anchor->{text}) . q{</a>};
     if (exists $anchor->{after}) {
-        $self->put_raw($anchor->{after});
+        $t .= $anchor->{after};
     }
-    return $self;
-}
-
-sub _insert_perl_link {
-    my($self, $data, $link, $title, $anchor) = @_;
-    ## no critic qw(Interpolation)
-    my $method = q{anchor('} . $self->escape_quote($data) . q{',}
-        . q{'} . $self->escape_quote($link) . q{',}
-        . q{'} . $self->escape_quote($title) . q{')};
-    $self->put_raw(qq{';\n\$t .= \$v->$method;\n\$t .= '});
-    return $self;
+    return $t;
 }
 
 # images: "{{ url | description }}"
@@ -972,6 +974,14 @@ Encode URI with parcent encoded for a name part.
 =item C<< $string = $creolize->escape_quote($string) >>
 
 Escape single quote with a backslash mark in the given string.
+
+=item C<< $string = $creolize->plugin($source) >>
+
+runtime plugin builder.
+
+=item C<< $string = $creolize->anchor($anchor) >>
+
+runtime link builder.
 
 =back
 

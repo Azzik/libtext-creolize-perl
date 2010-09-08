@@ -35,6 +35,7 @@ Free links without braces should be rendered as well, like http://www.wikicreole
 .sect expected
 sub{
 my($v) = @_;
+use utf8;
 my $t = '';
 $t .= '<p>You can make things <strong>bold</strong> or <em>italic</em> or <strong><em>both</em></strong> or <em><strong>both</strong></em>.</p>
 <p>Character formatting extends across line breaks: <strong>bold, this is still bold. This line deliberately does not end in star-star.</strong></p>
@@ -54,6 +55,7 @@ give the link a ~[[internal links|different]] name.
 .sect expected
 sub{
 my($v) = @_;
+use utf8;
 my $t = '';
 $t .= '<p>You can use [[internal links]].</p>
 <p>give the link a [[internal links|different]] name.</p>
@@ -70,12 +72,13 @@ give the link a [[internal links|different]] name.
 .sect expected
 sub{
 my($v) = @_;
+use utf8;
 my $t = '';
 $t .= '<p>You can use ';
-$t .= $v->anchor('[[internal links]]','internal links','internal links');
+$t .= $v->anchor({source=>'[[internal links]]',word=>'internal links',text=>'internal links'});
 $t .= '.</p>
 <p>give the link a ';
-$t .= $v->anchor('[[internal links|different]]','internal links','different');
+$t .= $v->anchor({source=>'[[internal links|different]]',word=>'internal links',text=>'different'});
 $t .= ' name.</p>
 ';
 return $t;
@@ -87,6 +90,7 @@ Modified << last_modified >>.
 .sect expected
 sub{
 my($v) = @_;
+use utf8;
 my $t = '';
 $t .= '<p>Modified ';
 $t .= $v->plugin('last_modified');
