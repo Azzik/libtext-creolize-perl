@@ -1,5 +1,9 @@
 Revision history for Text-Creolize
 
+0.013  Wed Sep  8 08:33:48 2010 UTC
+    + ADD: type property : type => 'xhtml' or type => 'perl'
+    + ADD: generate perl subroutine source code instead of XHTML when type is 'perl'.
+
 0.012  Tue Sep  7 03:01:05 2010 UTC
     + t/23.toc.t
     ! arrange initialization for toc support.

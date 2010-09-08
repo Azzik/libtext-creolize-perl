@@ -6,8 +6,8 @@ use Encode qw();
 use English qw(-no_match_vars);
 use Digest::MurmurHash;
 
-# $Id: Creolize.pm,v 0.012 2010/09/07 03:01:05Z tociyuki Exp $
-use version; our $VERSION = '0.012';
+# $Id: Creolize.pm,v 0.013 2010/09/08 08:33:48Z tociyuki Exp $
+use version; our $VERSION = '0.013';
 
 my $WTYPE_NULL = 0;
 my $WTYPE_TEXT = 1;
@@ -46,6 +46,7 @@ sub convert {
         $self->{result} = $toc . $self->{result};
     }
     if ($self->{type} eq 'perl') {
+        ## no critic qw(Interpolation)
         $self->{result} = "sub{\n"
             . "my(\$v) = \@_;\n"
             . "my \$t = '';\n"
@@ -341,8 +342,9 @@ sub visit_image {
 sub visit_plugin {
     my($self, $data, $builder) = @_;
     if ($builder->type eq 'perl') {
-        my $method= "plugin('" . $self->escape_quote($data) . "')";
-        $builder->put_raw("';\n\$t .= \$v->$method;\n\$t .= '");
+        ## no critic qw(Interpolation)
+        my $method= q{plugin('} . $self->escape_quote($data) . q{')};
+        $builder->put_raw(qq{';\n\$t .= \$v->$method;\n\$t .= '});
     }
     return $self;
 }
@@ -797,10 +799,11 @@ sub _insert_xhtml_link {
 
 sub _insert_perl_link {
     my($self, $data, $link, $title, $anchor) = @_;
-    my $method = "anchor('" . $self->escape_quote($data) . "',"
-        . "'" . $self->escape_quote($link) . "',"
-        . "'" . $self->escape_quote($title) . "')";
-    $self->put_raw("';\n\$t .= \$v->$method;\n\$t .= '");
+    ## no critic qw(Interpolation)
+    my $method = q{anchor('} . $self->escape_quote($data) . q{',}
+        . q{'} . $self->escape_quote($link) . q{',}
+        . q{'} . $self->escape_quote($title) . q{')};
+    $self->put_raw(qq{';\n\$t .= \$v->$method;\n\$t .= '});
     return $self;
 }
 
@@ -838,7 +841,7 @@ Text::Creolize - A practical converter for WikiCreole to XHTML.
 
 =head1 VERSION
 
-0.012
+0.013
 
 =head1 SYNOPSIS
 
@@ -863,8 +866,16 @@ to XHTML.
 
 =item C<< $creolize = Text::Creolize->new >>
 
-Creates new converter.
+Creates the Text::Creolize converter. We may set values of attributes
+with hash arguments of it.
 
+=item C<< $creolize->type >>
+
+Readwrite attribute accessor for the result type.
+Its default value is 'xhtml' to make text/xthml result.
+You can generate perl subroutine source code instead of text/xthml
+to set it 'perl'.
+ 
 =item C<< $creolize->script_name >>
 
 Readwrite attribute accessor for the script_name.
@@ -957,6 +968,10 @@ Encode URI with parcent encoded.
 =item C<< $string = $creolize->escape_name($string) >>
 
 Encode URI with parcent encoded for a name part.
+
+=item C<< $string = $creolize->escape_quote($string) >>
+
+Escape single quote with a backslash mark in the given string.
 
 =back
 

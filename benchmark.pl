@@ -6,11 +6,28 @@ use Text::WikiCreole ();
 
 my $wiki_source = do{local $/ = undef; <DATA> };
 
-my $r = timethese(200, {
+my $wiki_code = Text::Creolize->new(type => 'perl')->convert($wiki_source)->result;
+my $mock = bless {}, 'MockBuilder';
+my $r = timethese(400, {
     'Creolize' => sub { Text::Creolize->new->convert($wiki_source) },
     'WikiCreole' => sub{ Text::WikiCreole::creole_parse($wiki_source) },
+    'CreolizePl' => sub { (eval $wiki_code)->($mock) },
 });
 cmpthese($r);
+
+package MockBuilder;
+use Text::Creolize;
+
+sub plugin {return ''}
+
+sub anchor {
+    my($self, $data, $link, $title) = @_;
+    return q{} if $link =~ /script:/imosx;
+    $link = Text::Creolize->escape_uri("http://www.example.net/wiki/$link");
+    return qq{<a href="$link">}
+        . Text::Creolize->escape_text($title)
+        . q{</a>};
+}
 
 __END__
 = Top-level heading (1 1)
