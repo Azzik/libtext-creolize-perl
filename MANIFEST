@@ -13,6 +13,7 @@ t/20.heading.t
 t/21.pholder.t
 t/22.plugin.t
 t/23.toc.t
+t/30.perled-link.t
 tx/perlcritic.t
 tx/pod-coverage.t
 tx/pod.t

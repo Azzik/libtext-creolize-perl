@@ -30,18 +30,28 @@ sub plugin_visitor { return shift->_attr(plugin_visitor => @_) }
 sub result { return shift->_attr(result => @_) }
 sub toc { return shift->_attr(toc => @_) }
 sub tocinfo { return shift->_attr(tocinfo => @_) }
+sub type { return shift->_attr(type => @_) }
 
 sub convert {
     my($self, $wiki_source) = @_;
     $wiki_source =~ s/(?:\r\n?|\n)/\n/gmosx;
     chomp $wiki_source;
     $wiki_source .= "\n";
+    $self->{type} ||= 'xhtml';
     $self->{prev_wtype} = $WTYPE_NULL;
     $self->{blank} = q{};  # and clear
     $self->_scan($wiki_source);
     if (defined $self->{toc} && @{$self->{tocinfo}} >= $self->{toc}) {
         my $toc = $self->_list_toc->result;
         $self->{result} = $toc . $self->{result};
+    }
+    if ($self->{type} eq 'perl') {
+        $self->{result} = "sub{\n"
+            . "my(\$v) = \@_;\n"
+            . "my \$t = '';\n"
+            . "\$t .= '" . $self->{result} . "';\n"
+            . "return \$t;\n"
+            . "}\n";
     }
     return $self;
 }
@@ -58,11 +68,12 @@ sub _init {
         result => q{},
         blank => q{},
         tocinfo => [],
+        type => 'xhtml',
     );
     my $opt = ref $arg[0] eq 'HASH' && @arg == 1 ? $arg[0] : {@arg};
     for my $k (qw(
         script_name static_location
-        link_visitor plugin_visitor markup_visitor toc
+        link_visitor plugin_visitor markup_visitor toc type
     )) {
         next if ! exists $opt->{$k};
         $self->{$k} = $opt->{$k};
@@ -309,6 +320,9 @@ sub visit_link {
     my($self, $link, $title, $builder) = @_;
     return if $link =~ /script:/imosx;
     if ($link !~ m{\A(?:(?:https?|ftps?)://|\#)}mosx) {
+        if ($builder->type eq 'perl') {
+            return {defered => 'yes'};
+        }
         $link = $builder->script_name . $link;
     }
     return {href => $link};
@@ -326,6 +340,10 @@ sub visit_image {
 # $src = $creolize->plugin_visitor->visit_plugin($data, $creolize);
 sub visit_plugin {
     my($self, $data, $builder) = @_;
+    if ($builder->type eq 'perl') {
+        my $method= "plugin('" . $self->escape_quote($data) . "')";
+        $builder->put_raw("';\n\$t .= \$v->$method;\n\$t .= '");
+    }
     return $self;
 }
 
@@ -439,6 +457,12 @@ sub escape_name {
     }
     $name =~ s{([^a-zA-Z0-9_.\-:/])}{ sprintf "%%%02X", ord($1) }msxge;
     return $name;
+}
+
+sub escape_quote {
+    my($self, $data) = @_;
+    $data =~ s{'}{\\'}gmosx;
+    return $data;
 }
 
 sub hash_base36 {
@@ -737,9 +761,20 @@ sub _insert_link {
     my($self, $data, $link, $title) = @_;
     my $visitor = $self->{link_visitor} || $self;
     my $anchor = $visitor->visit_link($link, $title, $self);
-    if (! $anchor || (! $anchor->{name} && ! $anchor->{href})) {
-        return $self->put($data);
+    if ($anchor && $self->type eq 'perl' && $anchor->{defered}) {
+        $self->_insert_perl_link($data, $link, $title, $anchor);
     }
+    elsif ($anchor && ($anchor->{name} || $anchor->{href})) {
+        $self->_insert_xhtml_link($data, $link, $title, $anchor);
+    }
+    else {
+        $self->put($data);
+    }
+    return $self;
+}
+
+sub _insert_xhtml_link {
+    my($self, $data, $link, $title, $anchor) = @_;
     my $attr = q{};
     if (my $href = $anchor->{href}) {
         $attr .= q{ href="} . $self->escape_uri($href) . q{"};
@@ -757,7 +792,15 @@ sub _insert_link {
     if (exists $anchor->{after}) {
         $self->put_raw($anchor->{after});
     }
-    $self->{prev_wtype} = $WTYPE_ETAG;
+    return $self;
+}
+
+sub _insert_perl_link {
+    my($self, $data, $link, $title, $anchor) = @_;
+    my $method = "anchor('" . $self->escape_quote($data) . "',"
+        . "'" . $self->escape_quote($link) . "',"
+        . "'" . $self->escape_quote($title) . "')";
+    $self->put_raw("';\n\$t .= \$v->$method;\n\$t .= '");
     return $self;
 }
 
