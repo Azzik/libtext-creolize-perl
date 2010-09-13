@@ -6,8 +6,8 @@ use Encode qw();
 use English qw(-no_match_vars);
 use Digest::MurmurHash;
 
-# $Id: Creolize.pm,v 0.014 2010/09/13 08:36:32Z tociyuki Exp $
-use version; our $VERSION = '0.014';
+# $Id: Creolize.pm,v 0.015 2010/09/13 12:46:41Z tociyuki Exp $
+use version; our $VERSION = '0.015';
 
 my $WTYPE_NULL = 0;
 my $WTYPE_TEXT = 1;
@@ -865,7 +865,7 @@ Text::Creolize - A practical converter for WikiCreole to XHTML.
 
 =head1 VERSION
 
-0.014
+0.015
 
 =head1 SYNOPSIS
 
@@ -878,6 +878,10 @@ Text::Creolize - A practical converter for WikiCreole to XHTML.
     $source = decode('UTF-8', $source);
     my $xhtml = Text::Creolize->new->convert($source)->result;
     print encode('UTF-8', $xhtml);
+
+    my $perlsrc = Text::Creolize->new({type => 'perl'})->convert($source)->result;
+    $cache->set('key' => encode('UTF-8', $perlsrc));
+    $xhtml = (eval $perlsrc)->(Text::Creolize->new);
 
 =head1 DESCRIPTION
 
@@ -1023,10 +1027,6 @@ This must return a hash reference C<< @{$image}{qw(src id class alt title)} >>.
 The visitor's hook when the converter catches a plugin.
 This must return a hash reference C<< @{$plugin}{qw(runtime text xml content)} >>.
 
-=item C<< $markup_visitor->visit_markup($mark, $type, $builder) >>
-
-The visitor's hook when the converter catches a markup.
-
 =item C<< $string = $creolize->escape_text($string) >>
 
 Escapes XML special characters without XHTML entities.
@@ -1047,19 +1047,16 @@ Encode URI with parcent encoded for a name part.
 
 Escape single quote with a backslash mark in the given string.
 
-=item C<< $string = $creolize->plugin($source) >>
-
-runtime plugin builder.
-
-=item C<< $string = $creolize->anchor($anchor) >>
-
-runtime link builder.
-
 =back
 
 =head1 LIMITATION
 
 Cannot recognize double bracketted arrow links.
+
+=head1 REPOSITORY
+
+You can git-clone latest sources from
+L<http://github.com/tociyuki/libtext-creolize-perl>
 
 =head1 DEPENDENCIES
 

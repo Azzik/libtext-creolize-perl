@@ -1,5 +1,8 @@
 Revision history for Text-Creolize
 
+0.015  Mon Sep 13 12:46:41 2010 UTC
+    ! cleaning pod descriptions.
+
 0.014  Mon Sep 13 08:36:32 2010 UTC
     ! introduce 'runtime' boolean key on visitor's return hash.
 
