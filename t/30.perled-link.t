@@ -75,10 +75,10 @@ my($v) = @_;
 use utf8;
 my $t = '';
 $t .= '<p>You can use ';
-$t .= $v->anchor({source=>'[[internal links]]',word=>'internal links',text=>'internal links'});
+$t .= $v->_build_a_element('[[internal links]]',$v->visit_link('internal links','internal links',$v));
 $t .= '.</p>
 <p>give the link a ';
-$t .= $v->anchor({source=>'[[internal links|different]]',word=>'internal links',text=>'different'});
+$t .= $v->_build_a_element('[[internal links|different]]',$v->visit_link('internal links','different',$v));
 $t .= ' name.</p>
 ';
 return $t;
@@ -93,7 +93,7 @@ my($v) = @_;
 use utf8;
 my $t = '';
 $t .= '<p>Modified ';
-$t .= $v->plugin('last_modified');
+$t .= $v->_build_plugin($v->visit_plugin('last_modified',$v));
 $t .= '.</p>
 ';
 return $t;

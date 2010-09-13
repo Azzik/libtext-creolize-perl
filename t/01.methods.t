@@ -29,7 +29,7 @@ is(ref $tch->convert(q{}), ref $tch, 'convert -> self');
 ok(! ref $tch->result, 'result -> String');
 is(ref $tch->visit_link('link', 'title', $tch), 'HASH', q{visit_link -> Hash});
 is(ref $tch->visit_image('link', 'title', $tch), 'HASH', q{visit_image -> Hash});
-is(ref $tch->visit_plugin('string', $tch), ref $tch, q{visit_plugin -> self});
+is(ref $tch->visit_plugin('string', $tch), 'HASH', q{visit_plugin -> Hash});
 ok(! ref $tch->escape_text('string'), q{escape_text -> String});
 ok(! ref $tch->escape_xml('string'), q{escape_xml -> String});
 ok(! ref $tch->escape_uri('string'), q{escape_uri -> String});

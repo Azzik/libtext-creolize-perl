@@ -2027,9 +2027,9 @@ Creole1.0: Images
 
 {{http://example.org/image.jpg}}
 .sect expected
-<p><img src="http://www.example.net/static/image.jpg" alt="image.jpg" /></p>
+<p><img src="http://www.example.net/static/image.jpg" alt="" /></p>
 <p><img src="http://www.example.net/static/image.jpg" alt="tag" /></p>
-<p><img src="http://example.org/image.jpg" alt="http://example.org/image.jpg" /></p>
+<p><img src="http://example.org/image.jpg" alt="" /></p>
 
 Creole1.0: Bold combo
 .sect input
