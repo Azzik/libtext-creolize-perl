@@ -1,5 +1,8 @@
 Revision history for Text-Creolize
 
+0.014  Mon Sep 13 08:36:32 2010 UTC
+    ! introduce 'runtime' boolean key on visitor's return hash.
+
 0.013  Wed Sep  8 14:20:53 2010 UTC
     + ADD: type property : type => 'xhtml' or type => 'perl'
     + ADD: generate perl subroutine source code instead of XHTML when type is 'perl'.

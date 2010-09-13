@@ -6,8 +6,8 @@ use Encode qw();
 use English qw(-no_match_vars);
 use Digest::MurmurHash;
 
-# $Id: Creolize.pm,v 0.013 2010/09/08 14:20:53Z tociyuki Exp $
-use version; our $VERSION = '0.013';
+# $Id: Creolize.pm,v 0.014 2010/09/13 08:36:32Z tociyuki Exp $
+use version; our $VERSION = '0.014';
 
 my $WTYPE_NULL = 0;
 my $WTYPE_TEXT = 1;
@@ -865,7 +865,7 @@ Text::Creolize - A practical converter for WikiCreole to XHTML.
 
 =head1 VERSION
 
-0.013
+0.014
 
 =head1 SYNOPSIS
 
