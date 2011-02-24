@@ -1,5 +1,8 @@
 Revision history for Text-Creolize
 
+0.016  Thu Feb 24 05:57:47 2011 UTC
+    + ADD escape character '\\'.
+
 0.015  Mon Sep 13 12:46:41 2010 UTC
     ! cleaning pod descriptions.
 

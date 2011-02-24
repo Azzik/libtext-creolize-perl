@@ -1,4 +1,4 @@
-Text-Creolize version 0.015
+Text-Creolize version 0.016
 
 A practical implementation of the converter to XTHML from WikiCreole 1.0
 and additions.
@@ -21,7 +21,7 @@ Digest::MurmurHash
 
 COPYRIGHT AND LICENCE
 
-Copyright (C) 2010, MIZUTANI Tociyuki
+Copyright (C) 2011, MIZUTANI Tociyuki
 
 This library is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself.

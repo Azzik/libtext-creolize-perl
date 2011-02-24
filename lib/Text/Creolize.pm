@@ -6,8 +6,8 @@ use Encode qw();
 use English qw(-no_match_vars);
 use Digest::MurmurHash;
 
-# $Id: Creolize.pm,v 0.015 2010/09/13 12:46:41Z tociyuki Exp $
-use version; our $VERSION = '0.015';
+# $Id: Creolize.pm,v 0.016 2011/02/24 05:54:12Z tociyuki Exp $
+use version; our $VERSION = '0.016';
 
 my $WTYPE_NULL = 0;
 my $WTYPE_TEXT = 1;
@@ -148,7 +148,7 @@ my %MARKUP = (
 );
 my %XML_SPECIAL = (
     q{&} => q{&amp;}, q{<} => q{&lt;}, q{>} => q{&gt;},
-    q{"} => q{&quot;}, q{'} => q{&#39;},
+    q{"} => q{&quot;}, q{'} => q{&#39;}, q{\\} => q{&#92;},
 );
 my $AMP = qr{(?:[a-zA-Z_][a-zA-Z0-9_]*|\#(?:[0-9]{1,5}|x[0-9a-fA-F]{2,4}))}msx;
 my $S = qr{[\x20\t]}msx;
@@ -167,7 +167,7 @@ my $JUSTLIST = qr{(?:\*(?:(?!\*)|\*{2,})|\#(?:(?!\#)|\#{2,}))}msx;
 my $TOKEN = qr{                         (?#=> 'EOF' )
     (?: (\z)                            (?#=> 'EOF' )
     |   (\n)                            (?#=> 'EOL' )
-    |   (?:\A|(?<=\n))
+    |   ^
         (?: (\{\{\{\n.*?\n\}\}\}\n)   (?#=> 'VERBATIM' )
         |   $S* (?: (-{4,})$S*\n        (?#=> 'HRULE' )
             |   ($JUSTLIST$S*)          (?#=> 'JUSTLIST' )
@@ -359,7 +359,7 @@ sub visit_plugin {
 # GENERATORS
 sub put {
     my($self, $data) = @_;
-    $data =~ s{(?:([<>"'])|\&(?:($AMP);)?)}{
+    $data =~ s{(?:([<>"'\\])|\&(?:($AMP);)?)}{
         $1 ? $XML_SPECIAL{$1} : $2 ? qq{\&$2;} : q{&amp;}
     }egmosx;
     $self->{result} .= $self->{blank} . $data;
@@ -374,12 +374,12 @@ sub puts {
     if ($data eq q{}) {
         $self->{result} .= "\n";
         $self->{prev_wtype} = $WTYPE_NULL;
-        return $self;
     }
-    if ($self->{prev_wtype} == $WTYPE_TEXT
-        && $self->{result} =~ m{[\x21-\x7e]\z}mosx
-    ) {
-        $self->{blank} = q{ };
+    elsif ($self->{prev_wtype} == $WTYPE_TEXT) {
+        my $c = ord substr $self->{result}, -1;
+        if ($c >= 0x21 && $c <= 0x7e) {
+            $self->{blank} = q{ };
+        } 
     }
     elsif ($self->{prev_wtype} == $WTYPE_ETAG) {
         $self->{blank} = q{ };
@@ -434,13 +434,13 @@ sub _put_markup {
 
 sub escape_xml {
     my($self, $data) = @_;
-    $data =~ s{([&<>"'])}{ $XML_SPECIAL{$1} }egmosx;
+    $data =~ s{([&<>"'\\])}{ $XML_SPECIAL{$1} }egmosx;
     return $data;
 }
 
 sub escape_text {
     my($self, $data) = @_;
-    $data =~ s{(?:([<>"'])|\&(?:($AMP);)?)}{
+    $data =~ s{(?:([<>"'\\])|\&(?:($AMP);)?)}{
         $1 ? $XML_SPECIAL{$1} : $2 ? qq{\&$2;} : q{&amp;}
     }egmosx;
     return $data;
@@ -509,14 +509,14 @@ sub _end_h {
     my $mark = delete $self->{heading};
     $self->_end_block($mark);
     return $self if ! defined $self->{toc};
-    my $p = index $self->{result}, q{<h}, $self->{heading_pos};
-    return $self if $p < 0;
+    my $i = 3 + (index $self->{result}, q{<h}, $self->{heading_pos});
+    return $self if $i < 3;
     my $text = substr $self->{result}, $self->{heading_pos};
     chomp $text;
     $text =~ s/<.*?>//gmosx;
     return $self if ! $text;
     my $id = 'h' . $self->hash_base36($text);
-    substr $self->{result}, $p + 3, 0, qq{ id="$id"};
+    substr $self->{result}, $i, 0, qq{ id="$id"};
     push @{$self->{tocinfo}}, [length $mark, $id, $text];
     return $self;
 }
@@ -539,8 +539,7 @@ sub _list_toc {
 sub _insert_verbatim {
     my($self, $data) = @_;
     ($data) = $data =~ m/\A\{\{\{\n(.*?)[\x20\t]*\n\}\}\}\n\z/mosx;
-    $data =~ s/\A\x20\}\}\}/\}\}\}/mosx;
-    $data =~ s/\n\x20\}\}\}/\n\}\}\}/gmosx;
+    $data =~ s/^\x20\}\}\}/\}\}\}/gmosx;
     $self->_put_markup('verbatim', 'stag');
     $self->put_xml($data);
     $self->_put_markup('verbatim', 'etag');
@@ -747,7 +746,10 @@ sub _insert_plugin {
     local $self->{plugin_run} = 1; ## no critic qw(LocalVars)
     my $visitor = $self->{plugin_visitor} || $self;
     my $plugin = $visitor->visit_plugin($source, $self);
-    if ($plugin && $plugin->{runtime}) {
+    if (! $plugin) {
+        return $self;
+    }
+    if ($plugin->{runtime}) {
         ## no critic qw(Interpolation)
         my $proc= q{$v->_build_plugin($v->visit_plugin('}
             . $self->escape_quote($source)
@@ -865,7 +867,7 @@ Text::Creolize - A practical converter for WikiCreole to XHTML.
 
 =head1 VERSION
 
-0.015
+0.016
 
 =head1 SYNOPSIS
 
@@ -1075,7 +1077,7 @@ MIZUTANI Tociyuki  C<< <tociyuki@gmail.com> >>
 
 =head1 LICENSE AND COPYRIGHT
 
-Copyright (c) 2010, MIZUTANI Tociyuki C<< <tociyuki@gmail.com> >>.
+Copyright (c) 2011, MIZUTANI Tociyuki C<< <tociyuki@gmail.com> >>.
 All rights reserved.
 
 This module is free software; you can redistribute it and/or

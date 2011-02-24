@@ -230,7 +230,7 @@ like ~** bold ~**, ~// italics~//, ~\\ newlines,
 <p>| escape a | table | r2c1 | rc2c |</p>
 <p>{{{ escape nowiki <strong>with bold in it</strong> }}}</p>
 <p>; escape definition lists : like so</p>
-<p>you can also escape inline markup like ** bold **, // italics//, \\ newlines, [[ links ]], {{images}}, etc</p>
+<p>you can also escape inline markup like ** bold **, // italics//, &#92;&#92; newlines, [[ links ]], {{images}}, etc</p>
 
 .test inline
 .sect input
@@ -363,5 +363,5 @@ in lists
 2</td></tr>
 <tr><td>dash --</td><td>elipsis...</td></tr>
 </table>
-<pre>  anywhere but nowiki: (TM), (R), \\</pre>
+<pre>  anywhere but nowiki: (TM), (R), &#92;&#92;</pre>
 
