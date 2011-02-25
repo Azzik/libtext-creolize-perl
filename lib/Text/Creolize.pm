@@ -872,7 +872,7 @@ Text::Creolize - A practical converter for WikiCreole to XHTML.
 =head1 SYNOPSIS
 
     use Text::Creolize;
-    use File::Slrup;
+    use File::Slurp;
     use Encode;
 
     # from http://www.wikicreole.org/wiki/Creole1.0TestCases
