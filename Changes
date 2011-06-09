@@ -1,5 +1,9 @@
 Revision history for Text-Creolize
 
+0.017  Thu Jun 09 14:01:39 2011 UTC
+    ! cleanup code _insert_indent.
+    ! skip pushing tocinfo for empty headings.
+
 0.016  Thu Feb 24 05:57:47 2011 UTC
     + ADD escape character '\\'.
 
