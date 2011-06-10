@@ -1,5 +1,8 @@
 Revision history for Text-Creolize
 
+0.018  Thu Jun 10 01:42:33 2011 UTC
+    ! count signs with tr/// _insert_indent.
+
 0.017  Thu Jun 09 14:01:39 2011 UTC
     ! cleanup code _insert_indent.
     ! skip pushing tocinfo for empty headings.
