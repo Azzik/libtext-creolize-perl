@@ -1,5 +1,8 @@
 Revision history for Text-Creolize
 
+0.020  Thu Jun 12 15:08:05 2011 UTC
+    ! shift/unshift instead of pop/push in list and phrase stacks.
+
 0.019  Thu Jun 12 14:34:02 2011 UTC
     ! uses for loop in _insert_indent.
 

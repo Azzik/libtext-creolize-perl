@@ -6,8 +6,8 @@ use Encode qw();
 use English qw(-no_match_vars);
 use Digest::MurmurHash;
 
-# $Id: Creolize.pm,v 0.019 2011/06/12 14:34:02Z tociyuki Exp $
-use version; our $VERSION = '0.019';
+# $Id: Creolize.pm,v 0.020 2011/06/12 15:08:05Z tociyuki Exp $
+use version; our $VERSION = '0.020';
 
 my $WTYPE_NULL = 0;
 my $WTYPE_TEXT = 1;
@@ -557,7 +557,7 @@ sub _start_list {
 # inline colon "; term : definition"
 sub _insert_colon {
     my($self, $data) = @_;
-    return $self->_insert_list(q[:] x $self->{list}[-1][0]);
+    return $self->_insert_list(q{:} x $self->{list}[0][0]);
 }
 
 sub _insert_list {
@@ -566,32 +566,33 @@ sub _insert_list {
     my($mark) = $data =~ /\A([\*\#;:]+)/mosx;
     my $level = length $mark;
     $mark = substr $mark, 0, 1;
-    while (@{$self->{list}} > 1 && $level < $self->{list}[-1][0]) {
-        if ($self->{list}[-2][0] < $level) {
-            $self->{list}[-1][0] = $level;
+    my $list = $self->{list};
+    while ($#{$list} >= 1 && $level < $list->[0][0]) {
+        if ($list->[1][0] < $level) {
+            $list->[0][0] = $level;
             last;
         }
-        my $e = pop @{$self->{list}};
+        my $e = shift @{$list};
         $self->_put_markup($e->[1], 'etag');
     }
-    if (! @{$self->{list}}) {
+    if (! @{$list}) {
         $self->_put_markup($mark, 'stag');
-        push @{$self->{list}}, [$level, $mark];
+        unshift @{$list}, [$level, $mark];
     }
-    elsif ($self->{list}[-1][0] < $level) {
-        my $prev = $self->{list}[-1][1];
+    elsif ($list->[0][0] < $level) {
+        my $prev = $list->[0][1];
         if ($prev eq q{;} && ($mark eq q{*} || $mark eq q{#})) {
-            $self->_put_markup(q[;], q[:]);
-            $self->{list}[-1][1] = q[:];
+            $self->_put_markup(q{;}, q{:});
+            $list->[0][1] = q{:};
         }
         $self->puts(q{});
         $self->_put_markup($mark, 'stag');
-        push @{$self->{list}}, [$level, $mark];
+        unshift @{$list}, [$level, $mark];
     }
     else {
-        my $prev = $self->{list}[-1][1];
+        my $prev = $list->[0][1];
         $self->_put_markup($prev, $mark);
-        @{$self->{list}[-1]} = ($level, $mark);
+        @{$list->[0]} = ($level, $mark);
     }
     $self->_phrase_clear;
     return $self;
@@ -600,8 +601,7 @@ sub _insert_list {
 sub _end_list {
     my($self, $data) = @_;
     $self->_phrase_flush;
-    while (@{$self->{list}}) {
-        my $e = pop @{$self->{list}};
+    while (my $e = shift @{$self->{list}}) {
         $self->_put_markup($e->[1], 'etag');
     }
     $self->{list} = undef;
@@ -611,7 +611,7 @@ sub _end_list {
 # tables: "|=..|..|..|"
 sub _start_table {
     my($self, $data) = @_;
-    $self->_put_markup(q[||], 'stag');
+    $self->_put_markup(q{||}, 'stag');
     ($self->{table}) = $data =~ /\A(\|=?)/mosx;
     return $self->_start_block($self->{table});
 }
@@ -619,7 +619,7 @@ sub _start_table {
 sub _insert_tr {
     my($self, $data) = @_;
     $self->_end_block($self->{table});
-    $self->_put_markup(q[||], q[||]);
+    $self->_put_markup(q{||}, q{||});
     ($self->{table}) = $data =~ /\A(\|=?)/mosx;
     return $self->_start_block($self->{table});
 }
@@ -634,7 +634,7 @@ sub _insert_td {
 sub _end_table {
     my($self, $data) = @_;
     $self->_end_block($self->{table});
-    $self->_put_markup(q[||], 'etag');
+    $self->_put_markup(q{||}, 'etag');
     $self->{table} = undef;
     return $self;
 }
@@ -677,12 +677,12 @@ sub _insert_phrase {
     my($self, $mark) = @_;
     if (! $self->{phrase}{$mark}) {
         $self->{phrase}{$mark} = 1;
-        push @{$self->{phrase_stack}}, $mark;
+        unshift @{$self->{phrase_stack}}, $mark;
         $self->_put_markup($mark, 'stag');
     }
-    elsif ($self->{phrase_stack}[-1] eq $mark) {
+    elsif ($self->{phrase_stack}[0] eq $mark) {
         $self->{phrase}{$mark} = 0;
-        pop @{$self->{phrase_stack}};
+        shift @{$self->{phrase_stack}};
         $self->_put_markup($mark, 'etag');
     }
     else {
@@ -694,7 +694,7 @@ sub _insert_phrase {
 sub _phrase_flush {
     my($self) = @_;
     return $self if ! $self->{phrase_stack} || ! @{$self->{phrase_stack}};
-    while (my $mark = pop @{$self->{phrase_stack}}) {
+    while (my $mark = shift @{$self->{phrase_stack}}) {
         $self->_put_markup($mark, 'etag');
     }
     $self->{phrase} = {};
@@ -859,7 +859,7 @@ Text::Creolize - A practical converter for WikiCreole to XHTML.
 
 =head1 VERSION
 
-0.019
+0.020
 
 =head1 SYNOPSIS
 
