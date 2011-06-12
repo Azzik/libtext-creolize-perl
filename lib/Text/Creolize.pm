@@ -6,8 +6,8 @@ use Encode qw();
 use English qw(-no_match_vars);
 use Digest::MurmurHash;
 
-# $Id: Creolize.pm,v 0.018 2011/06/10 01:42:33Z tociyuki Exp $
-use version; our $VERSION = '0.018';
+# $Id: Creolize.pm,v 0.019 2011/06/12 14:34:02Z tociyuki Exp $
+use version; our $VERSION = '0.019';
 
 my $WTYPE_NULL = 0;
 my $WTYPE_TEXT = 1;
@@ -648,12 +648,11 @@ sub _start_indent {
 
 sub _insert_indent {
     my($self, $data) = @_;
-    my $indent = $self->{'indent'};
     my $level = $data =~ tr/>:/>:/;
-    my($kind, $step) = $indent < $level ? ('stag', +1) : ('etag', -1);
-    while ($indent != $level) {
+    my $step = $level - $self->{'indent'};
+    my $kind = $step > 0 ? 'stag' : 'etag';
+    for (1 .. abs $step) {
         $self->_put_markup(q{>}, $kind);
-        $indent += $step;
     }
     $self->{'indent'} = $level;
     return $self;
@@ -860,7 +859,7 @@ Text::Creolize - A practical converter for WikiCreole to XHTML.
 
 =head1 VERSION
 
-0.018
+0.019
 
 =head1 SYNOPSIS
 

@@ -1,5 +1,8 @@
 Revision history for Text-Creolize
 
+0.019  Thu Jun 12 14:34:02 2011 UTC
+    ! uses for loop in _insert_indent.
+
 0.018  Thu Jun 10 01:42:33 2011 UTC
     ! count signs with tr/// _insert_indent.
 
