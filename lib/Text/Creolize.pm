@@ -4,10 +4,9 @@ use strict;
 use warnings;
 use Encode qw();
 use English qw(-no_match_vars);
-use Digest::MurmurHash;
 
-# $Id: Creolize.pm,v 0.020 2011/06/12 15:08:05Z tociyuki Exp $
-use version; our $VERSION = '0.020';
+# $Id: Creolize.pm,v 0.021 2011/11/26 03:10:02Z tociyuki Exp $
+use version; our $VERSION = '0.021';
 
 my $WTYPE_NULL = 0;
 my $WTYPE_TEXT = 1;
@@ -479,13 +478,45 @@ sub hash_base36 {
     if (utf8::is_utf8($text)) {
         $text = Encode::encode_utf8($text);
     }
-    my $x = Digest::MurmurHash::murmur_hash($text);
-    my $b36 = q{};
-    for my $e (2176782336, 60466176, 1679616, 46656, 1296, 36, 1) {
-        $b36 .= $BASE36[$x / $e];
-        $x = $x % $e;
+    my $x = murmurhash_pp($text);
+    return hex_base36(sprintf '%08x', $x);
+}
+
+sub hex_base36 {
+    my($hexbigint) = @_;
+    use integer;
+    my @q = unpack 'C*', pack 'H*', $hexbigint;
+    my $base36 = q{};
+    for (0 .. 6) {
+        my $r = 0;
+        for my $j (0 .. $#q) {
+            my $a = ($r << 8) + $q[$j];
+            $q[$j] = $a / 36;
+            $r = $a % 36;
+        }
+        $base36 = $BASE36[$r] . $base36;
     }
-    return $b36;
+    return $base36;
+}
+
+sub murmurhash_pp {
+    my($s) = @_;
+    use integer;
+    my $len = length $s or return 0;
+    #if (my $paddings = (($len + 3) & 0xfffffffc) - $len) {
+    if (my $paddings = (($len + 3) & ~3) - $len) {
+        $s .= "\0" x $paddings;
+    }
+    my $h = 0x5bd1e995 * $len;
+    for (unpack 'V*', $s) {
+        $h = (($h + $_) * 0x5bd1e995) & 0xffffffff;
+        $h = ((($h >> 16) & 0x0000ffff) ^ $h) & 0xffffffff;
+    }
+    $h = ($h * 0x5bd1e995) & 0xffffffff;
+    $h = ((($h >> 10) & 0x003fffff) ^ $h) & 0xffffffff;
+    $h = ($h * 0x5bd1e995) & 0xffffffff;
+    $h = ((($h >> 17) & 0x00007fff) ^ $h) & 0xffffffff;
+    return $h;
 }
 
 # BLOCK ACTIONS
@@ -859,7 +890,7 @@ Text::Creolize - A practical converter for WikiCreole to XHTML.
 
 =head1 VERSION
 
-0.020
+0.021
 
 =head1 SYNOPSIS
 
@@ -1055,7 +1086,6 @@ L<http://github.com/tociyuki/libtext-creolize-perl>
 =head1 DEPENDENCIES
 
 L<Encode>
-L<Digest::MurmurHash>
 
 =head1 SEE ALSO
 

@@ -11,7 +11,6 @@ WriteMakefile(
     PREREQ_PM => {
         'Test::Base' => 0,
         'Encode' => 0,
-        'Digest::MurmurHash' => 0,
     },
     dist                => { COMPRESS => 'gzip -9f', SUFFIX => 'gz', },
 );

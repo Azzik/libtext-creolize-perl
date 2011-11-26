@@ -1,5 +1,10 @@
 Revision history for Text-Creolize
 
+0.021  Sat Nov 26 03:30:12 2011 UTC
+    ! uses pure perl murmurhash_pp.
+    ! rewrite base36 function with bigint divide.
+    ! remove dependency to Digest::MurmurHash from Makefile.PL
+
 0.020  Thu Jun 12 15:08:05 2011 UTC
     ! shift/unshift instead of pop/push in list and phrase stacks.
 

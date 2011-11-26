@@ -1,4 +1,4 @@
-Text-Creolize version 0.020
+Text-Creolize version 0.021
 
 A practical implementation of the converter to XTHML from WikiCreole 1.0
 and additions.
@@ -17,7 +17,6 @@ DEPENDENCIES
 
 Test::Base
 Encode
-Digest::MurmurHash
 
 COPYRIGHT AND LICENCE
 
