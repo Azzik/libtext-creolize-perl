@@ -23,11 +23,11 @@ package PluginTitle;
 sub new { bless {title => "TestPage"}, shift }
 
 sub visit_plugin {
-    my($self, $data, $builder) = @_;
+    my($self, $data) = @_;
     if ($data eq 'title') {
-        $builder->put($self->{title});
+        $self->{'text'} = $self->{'title'};
     }
-    return;
+    return $self;
 }
 
 __END__

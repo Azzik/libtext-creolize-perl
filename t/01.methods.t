@@ -1,6 +1,6 @@
 use strict;
 use warnings;
-use Test::Base tests => 30;
+use Test::Base tests => 27;
 use Text::Creolize;
 
 can_ok('Text::Creolize', 'new');
@@ -17,9 +17,9 @@ can_ok($tch, 'result');
 can_ok($tch, 'visit_link');
 can_ok($tch, 'visit_image');
 can_ok($tch, 'visit_plugin');
-can_ok($tch, 'put');
-can_ok($tch, 'puts');
-can_ok($tch, 'put_raw');
+#can_ok($tch, 'put');
+#can_ok($tch, 'puts');
+#can_ok($tch, 'put_raw');
 can_ok($tch, 'escape_text');
 can_ok($tch, 'escape_xml');
 can_ok($tch, 'escape_uri');

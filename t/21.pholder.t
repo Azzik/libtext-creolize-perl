@@ -28,12 +28,10 @@ __END__
 .test Place holder few lines
 .sect input
 <<<hoge
-fuga
->>>
+fuga>>>
 .sect expected
 <p><span class="placeholder">hoge
-fuga
-</span></p>
+fuga</span></p>
 
 .test Place holder escape xml
 .sect input

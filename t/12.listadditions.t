@@ -35,14 +35,14 @@ continue line.
 <dt>First title of definition list</dt>
 <dd>Definition of first item.</dd>
 <dt>Second title</dt>
-<dd>Second definition beginning on the same line.</dd>
+<dd>Second definition
+beginning on the same line.</dd>
 <dt>Third title</dt>
-<dd>Third definition here: show prev colon.
-<dl>
-<dd>And this also 3rd one.</dd>
-</dl>
-</dd>
-<dd>Obcource this is. continue line.</dd>
+<dd>:
+Third definition here: show prev colon.
+:: And this also 3rd one.
+: Obcource this is.
+continue line.</dd>
 <dt>final</dt>
 <dd>description.</dd>
 </dl>
@@ -59,7 +59,7 @@ continue line.
 :: defintion 3.4
 *** ulist 4
 *** ulist 5
-:: definition 6
+:: indented paragraph
 .sect expected
 <ul>
 <li>ulist 1
@@ -67,43 +67,49 @@ continue line.
 <dt>term 2</dt>
 <dd>definition 2</dd>
 <dt>term 3</dt>
-<dd>definition 3</dd>
-<dd>definition 3.1</dd>
-<dd>definition 3.2
-<dl>
-<dd>definition 3.3</dd>
-</dl>
-</dd>
-<dd>defintion 3.4
+<dd>: definition 3
+:: definition 3.1
+:: definition 3.2
+::: definition 3.3
+:: defintion 3.4
 <ul>
 <li>ulist 4</li>
 <li>ulist 5</li>
 </ul>
 </dd>
-<dd>definition 6</dd>
 </dl>
 </li>
 </ul>
+<div style="margin-left:2em">
+<div style="margin-left:2em">
+<p>indented paragraph</p>
+</div>
+</div>
 
 .test indented with colon
 .sect input
 ::: level 3
 continue
 continue
+::
 :: level 2
 :: level 2
+:
 : level 1
 level 1
 .sect expected
 <div style="margin-left:2em">
 <div style="margin-left:2em">
 <div style="margin-left:2em">
-<p>level 3 continue continue</p>
+<p>level 3
+continue
+continue</p>
 </div>
-<p>level 2</p>
-<p>level 2</p>
+<p>level 2
+level 2</p>
 </div>
-<p>level 1 level 1</p>
+<p>level 1
+level 1</p>
 </div>
 
 .test indented with angle bracket
@@ -111,20 +117,25 @@ level 1
 >>> level 3
 continue
 continue
+>>
 >> level 2
 >> level 2
+>
 > level 1
 level 1
 .sect expected
 <div style="margin-left:2em">
 <div style="margin-left:2em">
 <div style="margin-left:2em">
-<p>level 3 continue continue</p>
+<p>level 3
+continue
+continue</p>
 </div>
-<p>level 2</p>
-<p>level 2</p>
+<p>level 2
+level 2</p>
 </div>
-<p>level 1 level 1</p>
+<p>level 1
+level 1</p>
 </div>
 
 .test smart nesting

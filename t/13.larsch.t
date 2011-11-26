@@ -86,14 +86,15 @@ This **is
 bold** maybe
 .sect expected
 <p>This <strong>is</strong></p>
-<p>bold<strong>maybe</strong></p>
+<p>bold<strong> maybe</strong></p>
 
 Creole1.0: Bold should be able to cross lines
 .sect input
 This **is
 bold**
 .sect expected
-<p>This <strong>is bold</strong></p>
+<p>This <strong>is
+bold</strong></p>
 
 Creole1.0: Italic can be used inside paragraphs
 .sect input
@@ -160,14 +161,15 @@ This //is
 italic// maybe
 .sect expected
 <p>This <em>is</em></p>
-<p>italic<em>maybe</em></p>
+<p>italic<em> maybe</em></p>
 
 Creole1.0: Italic should be able to cross lines
 .sect input
 This //is
 italic//
 .sect expected
-<p>This <em>is italic</em></p>
+<p>This <em>is
+italic</em></p>
 
 Creole1.0: Bold italics
 .sect input
@@ -364,10 +366,14 @@ more more text.
 This is
 more more more text.
 .sect expected
-<p>This is my text.</p>
-<p>This is more text.</p>
-<p>This is more more text.</p>
-<p>This is more more more text.</p>
+<p>This is
+my text.</p>
+<p>This is
+more text.</p>
+<p>This is
+more more text.</p>
+<p>This is
+more more more text.</p>
 
 Creole1.0: A list end paragraphs
 .sect input
@@ -502,8 +508,13 @@ sat
 on a wall.
 .sect expected
 <ul>
-<li>The quick brown fox jumps over lazy dog.</li>
-<li>Humpty Dumpty sat on a wall.</li>
+<li>The quick
+brown fox
+    jumps over
+lazy dog.</li>
+<li>Humpty Dumpty
+sat 
+on a wall.</li>
 </ul>
 
 Creole1.0: An item can contain line breaks
@@ -565,7 +576,8 @@ World!
 **Not bold
 .sect expected
 <ul>
-<li>Hello, World!
+<li>Hello,
+World!
 <ul>
 <li>Not bold</li>
 </ul>
@@ -579,7 +591,8 @@ World!
 **Not bold
 .sect expected
 <ol>
-<li>Hello, World!
+<li>Hello,
+World!
 <ul>
 <li>Not bold</li>
 </ul>
@@ -594,7 +607,8 @@ World!
 **Bold
 .sect expected
 <ul>
-<li>Hello, World!</li>
+<li>Hello,
+World!</li>
 </ul>
 <p><strong>Bold</strong></p>
 
@@ -686,8 +700,13 @@ sat
 on a wall.
 .sect expected
 <ol>
-<li>The quick brown fox jumps over lazy dog.</li>
-<li>Humpty Dumpty sat on a wall.</li>
+<li>The quick
+brown fox
+    jumps over
+lazy dog.</li>
+<li>Humpty Dumpty
+sat 
+on a wall.</li>
 </ol>
 
 Creole1.0: An item can contain line breaks
@@ -749,7 +768,8 @@ World!
 ##Not monospace
 .sect expected
 <ol>
-<li>Hello, World!
+<li>Hello,
+World!
 <ol>
 <li>Not monospace</li>
 </ol>
@@ -763,7 +783,8 @@ World!
 ##Not bold
 .sect expected
 <ul>
-<li>Hello, World!
+<li>Hello,
+World!
 <ol>
 <li>Not bold</li>
 </ol>
@@ -778,7 +799,8 @@ World!
 ##Monospace
 .sect expected
 <ol>
-<li>Hello, World!</li>
+<li>Hello,
+World!</li>
 </ol>
 <p><tt>Monospace</tt></p>
 
@@ -905,8 +927,8 @@ Creole1.0: Ambiguity Bolds and Lists
 
  ** bold text **
 .sect expected
-<p><strong>bold text</strong></p>
-<p><strong>bold text</strong></p>
+<p><strong> bold text </strong></p>
+<p> <strong> bold text </strong></p>
 
 Creole1.0: Verbatim block
 .sect input
@@ -936,7 +958,7 @@ Creole1.0: Leading whitespaces are not permitted
 Hello
 }}}
 .sect expected
-<p><code>
+<p> <code>
 Hello
 </code></p>
 
@@ -958,7 +980,7 @@ Creole1.0: Assumed should preserve whitespace
 }}}
 .sect expected
 <pre>    Hello,  
-     World</pre>
+     World   </pre>
 
 Creole1.0: In preformatted blocks, one leading space is removed
 .sect input
@@ -1008,7 +1030,8 @@ Creole1.0: Escapes
 ~** Not Bold ~** ~// Not Italic ~//
 ~* Not Bullet
 .sect expected
-<p>** Not Bold ** // Not Italic // * Not Bullet</p>
+<p>** Not Bold ** // Not Italic //
+* Not Bullet</p>
 
 Creole1.0: Escapes following char is not a blank
 .sect input
@@ -1016,7 +1039,9 @@ Hello ~ world
 Hello ~
 world
 .sect expected
-<p>Hello ~ world Hello ~ world</p>
+<p>Hello ~ world
+Hello ~
+world</p>
 
 Creole1.0: Not escaping inside URLs
 .sect input
@@ -1056,7 +1081,7 @@ foo ----
 .sect expected
 <p>foo ----</p>
 <p>---- foo</p>
-<p>-- --</p>
+<p>  -- --  </p>
 
 Creole1.0: Tables
 .sect input
@@ -1395,7 +1420,8 @@ par
 
 par
 .sect expected
-<p>par par</p>
+<p>par
+par</p>
 <p>par</p>
 <p>par</p>
 
@@ -1513,7 +1539,8 @@ par
 par
 .sect expected
 <ul>
-<li>item par</li>
+<li>item
+par</li>
 </ul>
 <ul>
 <li>item</li>
@@ -1652,7 +1679,8 @@ par
 par
 .sect expected
 <ol>
-<li>item par</li>
+<li>item
+par</li>
 </ol>
 <ol>
 <li>item</li>

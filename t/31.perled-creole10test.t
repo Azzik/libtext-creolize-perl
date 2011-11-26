@@ -165,14 +165,18 @@ If interwiki links are setup in your wiki, this links to the WikiCreole page abo
 <h4>Subsub (2 4)</h4>
 <h5>Subsubsub (2 5)</h5>
 <p>You can make things <strong>bold</strong> or <em>italic</em> or <strong><em>both</em></strong> or <em><strong>both</strong></em>.</p>
-<p>Character formatting extends across line breaks: <strong>bold, this is still bold. This line deliberately does not end in star-star.</strong></p>
+<p>Character formatting extends across line breaks: <strong>bold,
+this is still bold. This line deliberately does not end in star-star.</strong></p>
 <p>Not bold. Character formatting does not cross paragraph boundaries.</p>
-<p>You can use <a href="http://www.example.net/wiki/internal%20links">internal links</a> or <a href="http://www.wikicreole.org">external links</a>, give the link a <a href="http://www.example.net/wiki/internal%20links">different</a> name.</p>
-<p>Here&#39;s another sentence: This wisdom is taken from <a href="http://www.example.net/wiki/Ward%20Cunningham%27s">Ward Cunningham&#39;s</a> <a href="http://www.c2.com/doc/wikisym/WikiSym2006.pdf">Presentation at the Wikisym 06</a>.</p>
+<p>You can use <a href="http://www.example.net/wiki/internal%20links">internal links</a> or <a href="http://www.wikicreole.org">external links</a>,
+give the link a <a href="http://www.example.net/wiki/internal%20links">different</a> name.</p>
+<p>Here&#39;s another sentence: This wisdom is taken from <a href="http://www.example.net/wiki/Ward%20Cunningham%27s">Ward Cunningham&#39;s</a>
+<a href="http://www.c2.com/doc/wikisym/WikiSym2006.pdf">Presentation at the Wikisym 06</a>.</p>
 <p>Here&#39;s a external link without a description: <a href="http://www.wikicreole.org">http://www.wikicreole.org</a></p>
-<p>Be careful that italic links are rendered properly: <em><a href="http://my.book.example/">My Book Title</a></em></p>
-<p>Free links without braces should be rendered as well, like <a href="http://www.wikicreole.org/">http://www.wikicreole.org/</a> and <a href="http://www.wikicreole.org/users/~example">http://www.wikicreole.org/users/~example</a>.</p>
-<p>Creole1.0 specifies that <a href="http://bar">http://bar</a> and <a href="ftp://bar">ftp://bar</a> should not render italic, something like foo:<em>bar should render as italic.</em></p>
+<p>Be careful that italic links are rendered properly:  <em><a href="http://my.book.example/">My Book Title</a></em> </p>
+<p>Free links without braces should be rendered as well, like <a href="http://www.wikicreole.org/">http://www.wikicreole.org/</a> and <a href="http://www.wikicreole.org/users/~example">http://www.wikicreole.org/users/~example</a>. </p>
+<p>Creole1.0 specifies that <a href="http://bar">http://bar</a> and <a href="ftp://bar">ftp://bar</a> should not render italic,
+something like foo:<em>bar should render as italic.</em></p>
 <p>You can use this to draw a line to separate the page:</p>
 <hr />
 <p>You can use lists, start it at the first column for now, please...</p>
@@ -196,7 +200,7 @@ If interwiki links are setup in your wiki, this links to the WikiCreole page abo
 <ol>
 <li><a href="http://www.example.net/wiki/item%201">item 1</a></li>
 <li>item 2</li>
-<li><em>italic item 3</em>
+<li><em> italic item 3 </em>
 <ol>
 <li>item 3.1</li>
 <li>item 3.2</li>
@@ -224,8 +228,10 @@ If interwiki links are setup in your wiki, this links to the WikiCreole page abo
 </li>
 </ul>
 <ul>
-<li>You can have multiline list items</li>
-<li>this is a second multiline list item</li>
+<li>You can have
+multiline list items</li>
+<li>this is a second multiline
+list item</li>
 </ul>
 <p>You can use nowiki syntax if you would like do stuff like this:</p>
 <pre>Guitar Chord C:
@@ -238,7 +244,7 @@ If interwiki links are setup in your wiki, this links to the WikiCreole page abo
 ||---|---|---|</pre>
 <p>You can also use it inline nowiki <code>in a sentence</code> like this.</p>
 <h1>Escapes</h1>
-<p>Normal Link: <a href="http://wikicreole.org/">http://wikicreole.org/</a> - now same link, but escaped: http://wikicreole.org/</p>
+<p>Normal Link: <a href="http://wikicreole.org/">http://wikicreole.org/</a> - now same link, but escaped: http://wikicreole.org/ </p>
 <p>Normal asterisks: **not bold**</p>
 <p>a tilde alone: ~</p>
 <p>a tilde escapes itself: ~xxx</p>
@@ -263,8 +269,8 @@ Mobile: abc</p>
 <table>
 <tr><th>Header title</th><th>Another header title</th></tr>
 <tr><td><code>//not italic text//</code></td><td><code>**not bold text**</code></td></tr>
-<tr><td><em>italic text</em></td><td><strong>bold text</strong></td></tr>
+<tr><td><em>italic text</em></td><td><strong>  bold text </strong></td></tr>
 </table>
 <h3>Creole 1.0</h3>
-<p>If interwiki links are setup in your wiki, this links to the <a href="http://www.example.net/wiki/WikiCreole">WikiCreole</a> page about Creole 1.0 test cases: <a href="http://www.example.net/wiki/WikiCreole:Creole1.0TestCases">WikiCreole:Creole1.0TestCases</a>.</p>
+<p>If interwiki links are setup in your wiki, this links to the WikiCreole page about Creole 1.0 test cases: <a href="http://www.example.net/wiki/WikiCreole:Creole1.0TestCases">WikiCreole:Creole1.0TestCases</a>.</p>
 

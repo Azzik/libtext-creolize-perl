@@ -5,13 +5,8 @@ use warnings;
 use Encode qw();
 use English qw(-no_match_vars);
 
-# $Id: Creolize.pm,v 0.021 2011/11/26 03:10:02Z tociyuki Exp $
+# $Id: Creolize.pm,v 0.021 2011/11/26 15:39:18Z tociyuki Exp $
 use version; our $VERSION = '0.021';
-
-my $WTYPE_NULL = 0;
-my $WTYPE_TEXT = 1;
-my $WTYPE_STAG = 2;
-my $WTYPE_ETAG = 3;
 
 # Text::Creolize->new(script_name => 'http:example.net/wiki/', ...);
 # Text::Creolize->new({script_name => 'http:example.net/wiki/', ...});
@@ -34,14 +29,11 @@ sub type { return shift->_attr(type => @_) }
 sub convert {
     my($self, $wiki_source) = @_;
     $wiki_source =~ s/(?:\r\n?|\n)/\n/gmosx;
-    chomp $wiki_source;
-    $wiki_source .= "\n";
+    $wiki_source =~ tr/\t/ /;
     $self->{type} ||= 'xhtml';
-    $self->{prev_wtype} = $WTYPE_NULL;
-    $self->{blank} = q{};  # and clear
-    $self->_scan($wiki_source);
+    $self->{result} = $self->_block($wiki_source);
     if (defined $self->{toc} && @{$self->{tocinfo}} >= $self->{toc}) {
-        my $toc = $self->_list_toc->result;
+        my $toc = $self->_list_toc;
         $self->{result} = $toc . $self->{result};
     }
     if ($self->{type} eq 'perl') {
@@ -65,9 +57,7 @@ sub _init {
         markup_visitor => undef,
         script_name => 'http://www.example.net/wiki/',
         static_location => 'http://www.example.net/static/',
-        prev_wtype => $WTYPE_NULL,
         result => q{},
-        blank => q{},
         tocinfo => [],
         type => 'xhtml',
     );
@@ -91,228 +81,444 @@ sub _attr {
 }
 
 my @BASE36 = ('0' .. '9', 'a' .. 'z');
-my %MARKUP = (
-    q{=} => {stag => q{<h1>}, etag => qq{</h1>\n}},
-    q{==} => {stag => q{<h2>}, etag => qq{</h2>\n}},
-    q{===} => {stag => q{<h3>}, etag => qq{</h3>\n}},
-    q{====} => {stag => q{<h4>}, etag => qq{</h4>\n}},
-    q{=====} => {stag => q{<h5>}, etag => qq{</h5>\n}},
-    q{======} => {stag => q{<h6>}, etag => qq{</h6>\n}},
-    q{p} => {stag => q{<p>}, etag => qq{</p>\n}},
-    q{verbatim} => {stag => q{<pre>}, etag => qq{</pre>\n}},
-    q{----} => {tag => qq{<hr />\n}},
-    q{*} => {
-        stag => qq{<ul>\n<li>}, etag => qq{</li>\n</ul>\n},
-        q{*} => qq{</li>\n<li>}, q{#} => qq{</li>\n</ul>\n<ol>\n<li>},
-        q{;} => qq{</li>\n</ul>\n<dl>\n<dt>},
-        q{:} => qq{</li>\n</ul>\n<dl>\n<dd>},
-    },
-    q{#} => {
-        stag => qq{<ol>\n<li>}, etag => qq{</li>\n</ol>\n},
-        q{#} => qq{</li>\n<li>}, q{*} => qq{</li>\n</ol>\n<ul>\n<li>},
-        q{;} => qq{</li>\n</ol>\n<dl>\n<dt>},
-        q{:} => qq{</li>\n</ul>\n<dl>\n<dd>},
-    },
-    q{;} =>  {
-        stag => qq{<dl>\n<dt>}, etag => qq{</dt>\n</dl>\n},
-        q{;} => qq{</dt>\n<dt>}, q{:} => qq{</dt>\n<dd>},
-        q{*} => qq{</dt>\n</dl>\n<ul>\n<li>},
-        q{#} => qq{</dt>\n</dl>\n<ol>\n<li>},
-    },
-    q{:} =>  {
-        stag => qq{<dl>\n<dd>}, etag => qq{</dd>\n</dl>\n},
-        q{;} => qq{</dd>\n<dt>}, q{:} => qq{</dd>\n<dd>},
-        q{*} => qq{</dd>\n</dl>\n<ul>\n<li>},
-        q{#} => qq{</dd>\n</dl>\n<ol>\n<li>},
-    },
-    q{||} => {
-        stag => qq{<table>\n<tr>}, etag => qq{</tr>\n</table>\n},
-        q{||} => qq{</tr>\n<tr>},
-    },
-    q{|} =>  {stag => q{<td>}, etag => q{</td>}},
-    q{|=} => {stag => q{<th>}, etag => q{</th>}},
-    q{>} => {
-        stag => qq{<div style="margin-left:2em">\n}, etag => qq{</div>\n},
-    },
-    q{**} => {stag => q{<strong>}, etag => q{</strong>}},
-    q{//} => {stag => q{<em>}, etag => q{</em>}},
-    q{##} => {stag => q{<tt>}, etag => q{</tt>}},
-    q{^^} => {stag => q{<sup>}, etag => q{</sup>}},
-    q{,,} => {stag => q{<sub>}, etag => q{</sub>}},
-    q{__} => {stag => q{<span class="underline">}, etag => q{</span>}},
-    q{\\\\} =>   {tag => qq{<br />\n}},
-    q{nowiki} => {stag => q{<code>}, etag => q{</code>}},
-    q{<<<} => {stag => q{<span class="placeholder">}, etag => q{</span>}},
-    q{toc} => {stag => qq{<div class="toc">\n}, etag => qq{</div>\n}},
-);
 my %XML_SPECIAL = (
     q{&} => q{&amp;}, q{<} => q{&lt;}, q{>} => q{&gt;},
     q{"} => q{&quot;}, q{'} => q{&#39;}, q{\\} => q{&#92;},
 );
 my $AMP = qr{(?:[a-zA-Z_][a-zA-Z0-9_]*|\#(?:[0-9]{1,5}|x[0-9a-fA-F]{2,4}))}msx;
 my $S = qr{[\x20\t]}msx;
-my $ESCAPED = qr{
-    (?: (?=[\x20\t\r\n])
-    |   \*+ | \/\/ | \\\\ | \#+ | \^\^ | ,, | __ | ;+ | \:+ | =+
-    |   \[\[[^\r\n]*?\]\] | \{\{(?:(?!\{)[^\r\n]*?\}\}|\{+) | <<+ | ----+
-    |   (?:[A-Z][a-z]+){2,}\b
-    |   https?://(?:[A-Za-z0-9\-._~:/?\#&+,;=]|%[0-9A-Fa-f]{2})+
-        (?:[A-Za-z0-9\-_~/\#&+=]|%[0-9A-Fa-f]{2})
-    |   ftps?://[A-Za-z0-9\-._/+]+[A-Za-z0-9\-_/+]
-    |   .
-    )
+
+my %MARKUP = (
+    '<hr>' => '<hr />', '</hr>' => "\n",
+    '<blockquote>' => qq{<div style="margin-left:2em">\n},
+    '</blockquote>' => "</div>\n", 
+    '<table>' => "<table>\n<tr>", '</table>' => "</tr>\n</table>\n",
+    '</table><table>' => "</tr>\n<tr>",
+    '<ul>' => "<ul>\n<li>", '</ul>' => "</li>\n</ul>\n",
+    '</ul><ul>' => "</li>\n<li>",
+    '<ol>' => "<ol>\n<li>", '</ol>' => "</li>\n</ol>\n",
+    '</ol><ol>' => "</li>\n<li>",
+    '<dl>' => "<dl>\n<dt>", '</dl>' => "</dd>\n</dl>\n",
+    '</dl><dl>' => "</dd>\n<dt>",
+    '<**>' => '<strong>',   '</**>' => '</strong>',
+    '<//>' => '<em>',       '<///>' => '</em>',
+    '<##>' => '<tt>',     '</##>' => '</tt>',
+    '<^^>' => '<sup>',      '</^^>' => '</sup>',
+    '<,,>' => '<sub>',      '</,,>' => '</sub>',
+    '<__>' => q{<span class="underline">}, '</__>' => q{</span>},
+    '<nowiki>' => '<code>', '</nowiki>' => '</code>',
+    '<placeholder>' => q{<span class="placeholder">},
+    '</placeholder>' => '</span>',
+    '<toc>' => qq{<div class="toc">\n}, '</toc>' => qq{</div>\n},
+);
+
+my $URIC = q{A-Za-z0-9\\-_~&*+=/}; # and q{.!\$'(),;:\@?\#}
+my $HYPERLINK = qr{
+    (?:f|ht)tps?://(?:[${URIC}.!\$'(),;:\@?\#]|%[0-9A-Fa-f]{2})+
 }msx;
-my $JUSTLIST = qr{(?:\*(?:(?!\*)|\*{2,})|\#(?:(?!\#)|\#{2,}))}msx;
-my $TOKEN = qr{                         (?#=> 'EOF' )
-    (?: (\z)                            (?#=> 'EOF' )
-    |   (\n)                            (?#=> 'EOL' )
-    |   ^
-        (?: (\{\{\{\n.*?\n\}\}\}\n)   (?#=> 'VERBATIM' )
-        |   $S* (?: (-{4,})$S*\n        (?#=> 'HRULE' )
-            |   ($JUSTLIST$S*)          (?#=> 'JUSTLIST' )
-            |   (\|=?)$S*               (?#=> 'TD' )
-            |   (\;+)$S*                (?#=> 'TERM' )
-            |   ((?:\>$S*)+)            (?#=> 'QUOTE' )
-            |   (=+)$S*))               (?#=> 'HEADING' )
-    |   ($S*=+)$S*(?=\n|\z)             (?#=> 'HEADING' )
-    |   (\*\*|\#\#)                     (?#=> 'MAYBELIST' )
-    |   ($S*\|)$S*(?=\n|\z)             (?#=> 'ENDTR' )
-    |   (\|=?$S*)                       (?#=> 'TD' )
-    |   (\:+)                           (?#=> 'DESC' )
-    |   (\/\/|\^\^|,,|__)               (?#=> 'PHRASE' )
-    |   (\\\\)                          (?#=> 'BREAK' )
-    |   (\{\{\{ .*? \}\}\}+)            (?#=> 'NOWIKI' )
-    |   (\[\[ [^\n]*? \]\])             (?#=> 'BRACKETED' )
-    |   (\{\{(?!\{) [^\n]*? \}\})       (?#=> 'BRACED' )
-    |   <<(?:<(.*?)>>>                  (?#=> 'PLACEHOLDER' )
-        |$S*(.*?)$S*>>)                 (?#=> 'PLUGIN')
-    |   (\{\{+ | \[\[+ | <<+)           (?#=> 'TEXT' )
-    |   \b
-        (   https?://(?:[A-Za-z0-9\-._~:/?\#&+,;=]|%[0-9A-Fa-f]{2})+
-            (?:[A-Za-z0-9\-_~/\#&+=]|%[0-9A-Fa-f]{2})
-        |   ftps?://[A-Za-z0-9\-._/+]+[A-Za-z0-9\-_/+]
-        |   (?:[A-Z][a-z]+){2,}\b)      (?#=> 'FREESTAND' )
-    |   (\~ $ESCAPED)                   (?#=> 'ESCAPE' )
-    |   ($S+)                           (?#=> 'BLANK' )
-    |   (.+?)                           (?#=> 'TEXT' )
-        (?= $S*
-            (?: \z
-            |   [\n~\|:] | \*\* | \#\# | \/\/ | \^\^ | \,\, | \_\_ | \\\\
-            |   \{\{ |\[\[ | <<
-            |   =+$S*(?:\n|\z)
-            |   \b (?:https?://|ftp://|(?:[A-Z][a-z]+){2,}\b)
+my $FREESTAND = qr{$HYPERLINK (?:[${URIC}\$\@\#]|%[0-9A-Fa-f]{2})}msx;
+my $INLINE_TERM = qr{
+        \[\[[^\]]*\]\] | \[+ | \{\{[^\}]*\}\}+ | \{+ | <<[^>]*>> | <+    
+    |   $FREESTAND | \\\\ | \*+ | // | \#+ | \^\^ | ,, | __
+}msx;
+my $TILD_ESCAPE = qr{~ (?: $INLINE_TERM | =+ | [^\n ]?)}msx;
+my $INLINE_SKIP = qr{$INLINE_TERM | $TILD_ESCAPE}msx;
+my $BLOCKQUOTE = qr{
+    .*?\n (?=\{\{\{\n
+    |[ ]*(?:[\n=|>;:]|-{4,}[ ]*\n|[*](?![*])|[*]{3,}|\#(?!\#)|\#{3,}) )
+}msx;
+
+my @BLOCK_SIGN = (
+    undef, undef,
+    'pre', '', 'hr', 'heading', 'heading', 'table', 'dl',
+    'blockquote', 'ul', 'ol',
+);
+
+sub _block {
+    my($self, $src) = @_;
+    chomp $src;
+    $src .= "\n\n";
+    my $c = {'code' => [], 'result' => q{}};
+    my $sign1 = 'p';
+    while (not $src =~ m{\G\z}msx) {
+        my($data1, $sign, $mark, $data);
+        if ($sign1 eq 'p' && $src =~ m{\G
+            (.*?)
+            ^(?: \{\{\{\n (.*?)\n \}\}\}\n
+            |   [ ]*
+                (?: () \n
+                |   () -{4,} [ ]* \n
+                |   (={1,6})=* [ ]* (.*?) [ ]* (?:=+[ ]*)? \n
+                |   ([|].*?) [ ]* (?:(?<!~)[|] [ ]*)? \n
+                |   ([;]+) [ ]*
+                |   ([:>] $BLOCKQUOTE (?:[ ]* [:>] $BLOCKQUOTE)*)
+                |   (?:([*](?![*])|[*]{3,}) | (\#(?!\#)|\#{3,})) [ ]*
+                )
             )
-        )
-    )
-}mosx;
-
-## no critic qw(ComplexMappings)
-my %TOKEN_DISPATCH = (
-    'EOF' => [
-        [undef], [undef, 3], [undef, 3], [undef, 0], [undef, 2], [undef, 2],
-        [undef, 4], [undef, 4], [undef, 4], [undef, 3, 1], [undef, 3, 1],
-        [undef, 2], [undef, 2],
-    ],
-    'EOL' => [
-        [0], [2, 27], [0, 3], [0, 0], [5, 27], [0, 2], [8], [8], [0, 4],
-        [10, 27], [0, 3, 1], [12, 27], [0, 2],
-    ],
-    'VERBATIM' => [
-        [0, 20], [0], [0, 3, 20], [0], [0], [0, 2, 20], [0], [0], [0, 4, 20],
-        [0], [0, 3, 1, 20], [0], [0, 2, 20],
-    ],
-    'HRULE' => [
-        [0, 11], [0], [0, 3, 11], [0], [0], [0, 2, 11], [0], [0], [0, 4, 11],
-        [0], [0, 3, 1, 11], [0], [0, 2, 11],
-    ],
-    'HEADING' => [
-        [3, 21], [1, 26], [3, 3, 21], [0, 0], [4, 26], [3, 2, 21], [6, 26],
-        [0], [3, 4, 21], [9, 26], [3, 3, 1, 21], [11, 26], [3, 2, 21],
-    ],
-    'JUSTLIST' => [
-        [4, 23], [0], [4, 3, 23], [0], [0], [4, 13], [0], [0], [4, 4, 23],
-        [0], [4, 3, 1, 23], [0], [4, 13],
-    ],
-    'MAYBELIST' => [
-        [1, 24, 15], [1, 15], [1, 15], [3, 15], [4, 15], [4, 13], [6, 15],
-        [0], [1, 4, 24, 15], [9, 15], [10, 15], [11, 15], [4, 13],
-    ],
-    'TD' => [
-        [6, 25], [1, 26], [6, 3, 25], [3, 26], [4, 26], [6, 2, 25], [6, 18],
-        [0], [6, 19], [9, 26], [6, 3, 1, 25], [11, 26], [6, 2, 25],
-    ],
-    'ENDTR' => [
-        [0], [1, 26], [0], [3, 26], [4, 26], [0], [7], [0], [0], [9, 26], [0],
-        [11, 26], [0],
-    ],
-    'TERM' => [
-        [11, 23], [0], [11, 3, 23], [0], [0], [11, 13], [0], [0], [11, 4, 23], [0], [11, 3, 1, 23], [0], [11, 13],
-    ],
-    'DESC' => [
-        [9, 22, 24], [1, 26], [9, 3, 22, 24], [3, 26], [4, 26], [4, 13],
-        [6, 26], [0], [9, 4, 22, 24], [9, 26], [9, 3, 12, 24], [4, 8],
-        [4, 13],
-    ],
-    'QUOTE' => [
-        [9, 22, 24], [0], [9, 3, 22, 24], [0], [0], [9, 2, 22, 24], [0], [0],
-        [9, 4, 22, 24], [0], [9, 3, 12, 24], [0], [9, 2, 22, 24],
-    ],
-    'BLANK' => [
-        [0], [1, 27], [2], [3, 27], [4, 27], [5], [6, 27], [0], [8], [9, 27],
-        [10], [11, 27], [12],
-    ],
-    (map{
-         my($token, $m) = @{$_};
-         ($token => [
-             [1, 24, $m], [1, $m], [1, $m], [3, $m], [4, $m], [4, $m],
-             [6, $m], [$m], [1, 4, 24, $m], [9, $m], [9, $m], [11, $m],
-             [11, $m],
-         ]);
-    } ['PHRASE' => 15], ['BREAK' => 5], ['NOWIKI' => 14], ['BRACKETED' => 7],
-      ['BRACED' => 6], ['PLACEHOLDER' => 16], ['PLUGIN' => 17],
-      ['FREESTAND' => 10], ['ESCAPE' => 9], ['TEXT' => 26],
-    ),
-);
-my @TOKEN_ACTION = qw(
-    _end_h _end_indent _end_list _end_p _end_table _insert_br _insert_braced
-    _insert_bracketed _insert_colon _insert_escaped _insert_freestand
-    _insert_hr _insert_indent _insert_list _insert_nowiki _insert_phrase
-    _insert_placeholder _insert_plugin _insert_td _insert_tr _insert_verbatim
-    _start_h _start_indent _start_list _start_p _start_table put puts
-);
-my @TOKEN_TABLE = map { $TOKEN_DISPATCH{$_} } @{_regexp_scan($TOKEN)};
-
-sub _regexp_scan {
-    my($regexp) = @_;
-    my $list = join q{,}, "$regexp" =~ /\(\?\#=>\s*(\S*)\s*\)/gmsx;
-    return eval "[$list]";  ## no critic (StringyEval)
-}
-
-sub _scan {
-    my($self, $wiki_source) = @_;
-    my $put_text = $TOKEN_DISPATCH{'TEXT'}[1][1];
-    my @action = map { $self->can($_) } @TOKEN_ACTION;
-    my $state = 0;
-    while (defined $state) {
-        $wiki_source =~ /\G$TOKEN/gcmosx;
-        my($data, $token) = ($LAST_PAREN_MATCH, $#LAST_MATCH_START);
-        my($succ, @methods) = @{$TOKEN_TABLE[$token][$state]};
-        $state = $succ;
-        for my $i (@methods) {
-            if ($i == $put_text) {
-                $data =~ s{(?:([<>"'])|\&(?:($AMP);)?)}{
-                    $1 ? $XML_SPECIAL{$1} : $2 ? qq{\&$2;} : q{&amp;}
-                }egmosx;
-                $self->{result} .= $self->{blank} . $data;
-                $self->{blank} = q{};
-                $self->{prev_wtype} = $WTYPE_TEXT;
+        }cgmosx) {
+            $data1 = $1;
+            $sign = $BLOCK_SIGN[$#-];
+            $mark = $5 || $8 || $10 || $11 || q{};
+            $data = $+;
+        }
+        elsif ($sign1 eq 'dl' && $src =~ m{\G
+            (.*?)
+            ^(?: \{\{\{\n (.*?)\n \}\}\}\n
+            |   [ ]*
+                (?: () \n
+                |   () -{4,} [ ]* \n
+                |   (={1,6})=* [ ]* (.*?) [ ]* (?:=+[ ]*)? \n
+                |   ([|].*?) [ ]* (?:(?<!~)[|] [ ]*)? \n
+                |   ([;]+) [ ]*
+                |   ([>] $BLOCKQUOTE (?:[ ]* [:>] $BLOCKQUOTE)*)
+                |   (?:([*](?![*])|[*]{3,}) | (\#(?!\#)|\#{3,})) [ ]*
+                )
+            )
+        }cgmosx) {
+            $data1 = $1;
+            $sign = $BLOCK_SIGN[$#-];
+            $mark = $5 || $8 || $10 || $11 || q{};
+            $data = $+;
+        }
+        elsif ($src =~ m{\G
+            (.*?)
+            ^(?: \{\{\{\n (.*?)\n \}\}\}\n
+            |   [ ]*
+                (?: () \n
+                |   () -{4,} [ ]* \n
+                |   (={1,6})=* [ ]* (.*?) [ ]* (?:=+[ ]*)? \n
+                |   ([|].*?) [ ]* (?:(?<!~)[|] [ ]*)? \n
+                |   ([;]+) [ ]*
+                |   ([:>] $BLOCKQUOTE (?:[ ]* [:>] $BLOCKQUOTE)*)
+                |   (?:([*]+)|(\#+)) [ ]*
+                )
+            )
+        }cgmosx) {
+            $data1 = $1;
+            $sign = $BLOCK_SIGN[$#-];
+            $mark = $5 || $8 || $10 || $11 || q{};
+            $data = $+;
+        }
+        if ($data1 ne q{}) {
+            chomp $data1;
+            if ($sign1 eq 'p') {
+                $self->_emit_block($c, 'p', '');
+            }
+            if ($sign1 eq 'dl') {
+                $self->_definition_list($c, $data1);
             }
             else {
-               $action[$i]->($self, $data);
+                $c->{'result'} .= $self->_inline($data1);
             }
         }
+        $sign1 = 'p';
+        if ($sign eq 'heading') {
+            $self->_heading($c, $mark, $data);
+            next;
+        }
+        $self->_emit_block($c, $sign, $mark);
+        if ($sign eq 'pre') {
+            $data =~ s/^[ ](\}{3})/$1/gmosx;
+            $c->{'result'} .= $self->escape_xml($data);
+        }
+        elsif ($sign eq 'table') {
+            $self->_table_row($c, $data);
+        }
+        elsif ($sign eq 'blockquote') {
+            $data =~ s/^[ ]*[:>][ ]?//gmsx;
+            $c->{'result'} .= $self->_block($data);
+        }
+        elsif ($sign eq 'dl' || $sign eq 'ul' || $sign eq 'ol') {
+            $sign1 = $sign;
+        }
+    }
+    return $c->{'result'};
+}
+
+sub _heading {
+    my($self, $c, $mark, $data) = @_;
+    $self->_emit_block($c, '', '');
+    my $level = length $mark;
+    my $inline = $self->_inline($data);
+    my $attr = q{};
+    if (defined $self->toc) {
+        my $text = $inline;
+        $text =~ s/<.*?>//gmosx;
+        if ($text !~ m/\A[ ]*\z/msx) {
+            my $id = 'h' . $self->hash_base36($text);
+            $attr = qq{ id="$id"};
+            push @{$self->{tocinfo}}, [$level, $id, $text];
+        }
+    }
+    $c->{'result'} .= "<h$level$attr>" . $inline . "</h$level>\n";
+    return $c;
+}
+
+sub _list_toc {
+    my($self) = @_;
+    my $c = {'result' => q{}, 'code' => []};
+    for my $info (@{$self->{tocinfo}}) {
+        $self->_emit_block($c, 'ul', q{*} x $info->[0]);
+        $self->_insert_link($c, $info->[2], "#$info->[1]", $info->[2]);
+    }
+    $self->_emit_block($c, q{}, q{});
+    return $MARKUP{'<toc>'} . $c->{'result'} . $MARKUP{'</toc>'};
+}
+
+sub _table_row {
+    my($self, $c, $data) = @_;
+    my $result = q{};
+    $data .= q{|};
+    while ($data =~ m{\G
+        ([|]=?) [ ]* ([^|~\[\{]*?(?:$INLINE_SKIP [^|~\[\{]*?)*?) [ ]* (?=[|])
+    }gcmosx) {
+        my($mark, $inline) = ($1, $2);
+        my $td = $mark eq q{|=} ? 'th' : 'td';
+        $result .= qq{<$td>} . $self->_inline($inline) . qq{</$td>};
+    }
+    $c->{'result'} .= $result;
+    return $c;
+}
+
+sub _definition_list {
+    my($self, $c, $data) = @_;
+    my($dt, $dd) = $data =~ m{\A
+        ([^:~\[\{]*? (?:$INLINE_SKIP [^:~\[\{]*)*?) (?:[\n ]*[:][ ]*(.*))?
+    \z}msx;
+    $dd = defined $dd ? $dd : q{};
+    $c->{'result'} .= $self->_inline($dt) . "</dt>\n<dd>" . $self->_inline($dd);
+    return $c;
+}
+
+sub _emit_block {
+    my($self, $c, $sign, $mark) = @_;
+    my $level = length $mark;
+    my $result = q{};
+    my $code = $c->{'code'};
+    if ($level > 0 && @{$code} && $code->[0][0] == 0) {
+        $self->_emit_block($c, '', '');
+    }
+    while ($#{$code} >= 1 && $level < $code->[0][0]) {
+        if ($code->[1][0] < $level) {
+            $code->[0][0] = $level;
+            last;
+        }
+        if (my $prev = (shift @{$code})->[1]) {
+            my $e = "</$prev>";
+            $result .= exists $MARKUP{$e} ? $MARKUP{$e} : "$e\n";
+        }
+    }
+    my $s = "<$sign>";
+    if (! @{$code}) {
+        if ($sign) {
+            $result .= exists $MARKUP{$s} ? $MARKUP{$s} : $s;
+        }
+        unshift @{$code}, [$level, $sign];
+    }
+    elsif ($code->[0][1] && $code->[0][0] < $level) {
+        $result .= "\n";
+        if ($sign) {
+            $result .= exists $MARKUP{$s} ? $MARKUP{$s} : $s;
+        }
+        unshift @{$code}, [$level, $sign];
+    }
+    else {
+        my $prev = $code->[0][1];
+        my $e = "</$prev>";
+        if (! $sign && $prev) {
+            $result .= exists $MARKUP{$e} ? $MARKUP{$e} : "$e\n";
+        }
+        elsif ($sign && ! $prev) {
+            $result .= exists $MARKUP{$s} ? $MARKUP{$s} : $s;
+        }
+        elsif ($sign && $prev) {
+            my $joint = "$e$s";
+            $result .= $MARKUP{$joint}
+                || ((exists $MARKUP{$e} ? $MARKUP{$e} : "$e\n")
+                    .(exists $MARKUP{$s} ? $MARKUP{$s} : $s));
+        }
+        @{$code->[0]} = ($level, $sign);
+    }
+    $c->{'result'} .= $result;
+    return $c;
+}
+
+my($EOF, $LINK, $NOWIKI, $IMG, $BR, $PHRASE, $TILD,
+    $PLACEHOLDER, $PLUGIN, ) = (0 .. 8);
+my @INLINE_SIGN = (
+    undef, undef, $EOF, $LINK, $LINK, $LINK, $NOWIKI,
+    $IMG, $IMG, $IMG, $LINK, $BR, $PHRASE, $TILD,
+    $PLACEHOLDER, $PLACEHOLDER, $PLUGIN, $PLUGIN,
+);
+
+sub _inline {
+    my($self, $inline) = @_;
+    my $c = {'result' => q{}};
+    my %phrase_member;
+    my @phrase;
+    while ($inline =~ m{\G
+        (.*?)
+        (?: (\z)
+        |   (\[\[ [ ]* ([^|\]]+?) [ ]* (?: [|] [ ]* ([^\]]*?) [ ]*)? \]\])
+        |   (\{\{\{ .*? \}\}\}+)
+        |   (\{\{ [ ]* ([^|\}]+?) [ ]* (?: [|] [ ]* ([^\}]*?) [ ]*)? \}\})
+        |   \b ($FREESTAND)
+        |   (\\\\) [\t\n\x20]*
+        |   (\*\* | // | \#\# | \^\^ | ,, | __)
+        |   ($TILD_ESCAPE)
+        |   (<<<(.*?)>>>)
+        |   (<< [ ]* (.*?)  [ ]* >>)
+        )
+    }gcmosx) {
+        my($type, $text) = ($INLINE_SIGN[$#-], $3 || $7 || $+);
+        $c->{'result'} .= $self->escape_text($1);
+        last if $type == $EOF;
+        if ($type == $LINK) {
+            my $href = defined $10 ? $10 : $4;
+            my $desc = defined $5 ? $5 : $href;
+            $self->_insert_link($c, $text, $href, $desc);
+            next;
+        }
+        elsif ($type == $IMG) {
+            my $src = $8;
+            my $alt = defined $9 ? $9 : q{};
+            $self->_insert_braced($c, $text, $src, $alt);
+            next;
+        }
+        elsif ($type == $BR) {
+            $c->{'result'} .= qq{<br />\n};
+            next;
+        }
+        elsif ($type == $PHRASE) {
+            if (! $phrase_member{$text}) {
+                $phrase_member{$text} = 1;
+                unshift @phrase, $text;
+                $c->{'result'} .= $MARKUP{"<$text>"};
+                next;
+            }
+            elsif ($phrase[0] eq $text) {
+                $phrase_member{$text} = 0;
+                shift @phrase;
+                $c->{'result'} .= $MARKUP{"</$text>"};
+                next;
+            }
+        }
+        elsif ($type == $PLACEHOLDER) {
+            $c->{'result'} .= $MARKUP{'<placeholder>'} . $self->escape_xml($text) . $MARKUP{'</placeholder>'};
+            next;
+        }
+        elsif ($type == $PLUGIN) {
+            $self->_insert_plugin($c, $text);
+            next;
+        }
+        elsif ($type == $NOWIKI) {
+            my($data) = $text =~ m/\A... [ ]* (.*?) [ ]* ...\z/mosx;
+            $c->{'result'} .= $MARKUP{'<nowiki>'} . $self->escape_xml($data) . $MARKUP{'</nowiki>'};
+            next;
+        }
+        elsif ($type == $TILD && $text ne q{~}) {
+            $text = substr $text, 1;
+        }
+        $c->{'result'} .= $self->escape_text($text);
+    }
+    $c->{'result'} .= join q{}, map { $MARKUP{"</$_>"} } @phrase;
+    return $c->{'result'};
+}
+
+sub _insert_link {
+    my($self, $c, $source, $link, $text) = @_;
+    my $visitor = $self->{link_visitor} || $self;
+    my $anchor = $visitor->visit_link($link, $text, $self);
+    if ($anchor && $self->type eq 'perl' && $anchor->{runtime}) {
+        ## no critic qw(Interpolation)
+        my $proc = q{$v->_build_anchor(}
+            . q{'} . $self->escape_quote($source) . q{',}
+            . q{$v->visit_link(}
+                . q{'} . $self->escape_quote($link) . q{',}
+                . q{'} . $self->escape_quote($text) . q{',}
+                . q{$v}
+            . q{)}
+        . q{)};
+        $c->{'result'} .= qq{';\n\$t .= $proc;\n\$t .= '};
+    }
+    elsif ($anchor && ($anchor->{name} || $anchor->{href})) {
+        $c->{'result'} .= $self->_build_anchor($source, $anchor);
+    }
+    else {
+        $c->{'result'} .= $self->escape_text($source);
     }
     return $self;
+}
+
+sub _build_anchor {
+    my($self, $source, $anchor) = @_;
+    if (! $anchor->{href} && ! $anchor->{name}) {
+        return $self->escape_xml($source);
+    }
+    my $t = q{};
+    if (exists $anchor->{before}) {
+        $t .= $anchor->{before};
+    }
+    my $attr = q{};
+    if (my $href = $anchor->{href}) {
+        $attr .= q{ href="} . $self->escape_uri($href) . q{"};
+    }
+    for my $k (qw(id name class rel rev type title)) {
+        next if ! $anchor->{$k};
+        $attr .= qq{ $k="} . $self->escape_text($anchor->{$k}) . q{"};
+    }
+    $t .= qq{<a$attr>} . $self->escape_text($anchor->{text}) . q{</a>};
+    if (exists $anchor->{after}) {
+        $t .= $anchor->{after};
+    }
+    return $t;
+}
+
+sub _insert_braced {
+    my($self, $c, $text, $link, $title) = @_;
+    my $visitor = $self->{link_visitor} || $self;
+    my $image = $visitor->visit_image($link, $title, $self);
+    if (! $image || ! $image->{src}) {
+        $c->{'result'} .= $self->escape_text($text);
+        return $self;
+    }
+    my $attr = q{ src="} . $self->escape_uri($image->{src}) . q{"};
+    for my $k (qw(id class alt title)) {
+        next if ! defined $image->{$k};
+        $attr .= qq{ $k="} . $self->escape_text($image->{$k}) . q{"};
+    }
+    $c->{'result'} .= qq{<img$attr />};
+    return $self;
+}
+
+sub _insert_plugin {
+    my($self, $c, $source) = @_;
+    return $self if $self->{plugin_run}; # avoid recursive calls
+    local $self->{plugin_run} = 1; ## no critic qw(LocalVars)
+    my $visitor = $self->{plugin_visitor} || $self;
+    my $plugin = $visitor->visit_plugin($source, $self);
+    if (! $plugin) {
+        return $self;
+    }
+    if ($plugin->{runtime}) {
+        ## no critic qw(Interpolation)
+        my $proc= q{$v->_build_plugin($v->visit_plugin('}
+            . $self->escape_quote($source)
+            . q{',$v))};
+        $c->{'result'} .= qq{';\n\$t .= $proc;\n\$t .= '};
+    }
+    else {
+        $c->{'result'} .= $self->_build_plugin($plugin);
+    }
+    return $self;
+}
+
+sub _build_plugin {
+    my($self, $plugin) = @_;
+    return defined $plugin->{content} ? $plugin->{content}
+        : defined $plugin->{text} ? $self->escape_text($plugin->{text})
+        : defined $plugin->{xml} ? $self->escape_xml($plugin->{xml})
+        : q{};
 }
 
 # VISITORS
@@ -353,82 +559,6 @@ sub visit_plugin {
     }
     $plugin->{text} = q{};
     return $plugin;
-}
-
-# GENERATORS
-sub put {
-    my($self, $data) = @_;
-    $data =~ s{(?:([<>"'\\])|\&(?:($AMP);)?)}{
-        $1 ? $XML_SPECIAL{$1} : $2 ? qq{\&$2;} : q{&amp;}
-    }egmosx;
-    $self->{result} .= $self->{blank} . $data;
-    $self->{blank} = q{};
-    $self->{prev_wtype} = $WTYPE_TEXT;
-    return $self;
-}
-
-sub puts {
-    my($self, $data) = @_;
-    $self->{blank} = q{};
-    if ($data eq q{}) {
-        $self->{result} .= "\n";
-        $self->{prev_wtype} = $WTYPE_NULL;
-    }
-    elsif ($self->{prev_wtype} == $WTYPE_TEXT) {
-        my $c = ord substr $self->{result}, -1;
-        if ($c >= 0x21 && $c <= 0x7e) {
-            $self->{blank} = q{ };
-        } 
-    }
-    elsif ($self->{prev_wtype} == $WTYPE_ETAG) {
-        $self->{blank} = q{ };
-    }
-    return $self;
-}
-
-sub put_xml {
-    my($self, $data) = @_;
-    $self->{result} .= $self->{blank} . $self->escape_xml($data);
-    $self->{blank} = q{};
-    $self->{prev_wtype} = $WTYPE_TEXT;
-    return $self;
-}
-
-sub put_raw {
-    my($self, $data) = @_;
-    $self->{result} .= $self->{blank} . $data;
-    $self->{blank} = q{};
-    $self->{prev_wtype} = $WTYPE_TEXT;
-    return $self;
-}
-
-sub _start_block {
-    my($self, $mark) = @_;
-    $self->{result} .= $self->{blank} . $MARKUP{$mark}{'stag'};
-    $self->{blank} = q{};
-    $self->{prev_wtype} = $WTYPE_STAG;
-    $self->{phrase} = {};
-    return $self;
-}
-
-sub _end_block {
-    my($self, $mark) = @_;
-    $self->_phrase_flush;
-    $self->{result} .= $MARKUP{$mark}{'etag'};
-    $self->{blank} = q{};
-    $self->{prev_wtype} = $WTYPE_ETAG;
-    return $self;
-}
-
-sub _put_markup {
-    my($self, $mark, $type) = @_;
-    if ($type ne 'stag') {
-        $self->{blank} = q{};
-    }
-    $self->{result} .= $self->{blank} . $MARKUP{$mark}{$type};
-    $self->{blank} = q{};
-    $self->{prev_wtype} = $type eq 'etag' ? $WTYPE_ETAG : $WTYPE_STAG;
-    return $self;
 }
 
 sub escape_xml {
@@ -478,11 +608,11 @@ sub hash_base36 {
     if (utf8::is_utf8($text)) {
         $text = Encode::encode_utf8($text);
     }
-    my $x = murmurhash_pp($text);
-    return hex_base36(sprintf '%08x', $x);
+    my $x = _murmurhash_pp($text);
+    return _hex_base36(sprintf '%08x', $x);
 }
 
-sub hex_base36 {
+sub _hex_base36 {
     my($hexbigint) = @_;
     use integer;
     my @q = unpack 'C*', pack 'H*', $hexbigint;
@@ -499,11 +629,10 @@ sub hex_base36 {
     return $base36;
 }
 
-sub murmurhash_pp {
+sub _murmurhash_pp {
     my($s) = @_;
     use integer;
     my $len = length $s or return 0;
-    #if (my $paddings = (($len + 3) & 0xfffffffc) - $len) {
     if (my $paddings = (($len + 3) & ~3) - $len) {
         $s .= "\0" x $paddings;
     }
@@ -517,365 +646,6 @@ sub murmurhash_pp {
     $h = ($h * 0x5bd1e995) & 0xffffffff;
     $h = ((($h >> 17) & 0x00007fff) ^ $h) & 0xffffffff;
     return $h;
-}
-
-# BLOCK ACTIONS
-# paragraphs
-sub _start_p { return shift->_start_block('p') }
-sub _end_p { return shift->_end_block('p') }
-
-# horizontal rules
-sub _insert_hr { return shift->_put_markup(q{----}, 'tag') }
-
-# headings
-sub _start_h {
-    my($self, $data) = @_;
-    ($self->{heading}) = $data =~ /\A(={1,6})/mosx;
-    $self->{heading_pos} = length $self->{result};
-    return $self->_start_block($self->{heading});
-}
-
-sub _end_h {
-    my($self, $data) = @_;
-    my $mark = delete $self->{heading};
-    $self->_end_block($mark);
-    return $self if ! defined $self->{toc};
-    my $i = 3 + (index $self->{result}, q{<h}, $self->{heading_pos});
-    return $self if $i < 3;
-    my $text = substr $self->{result}, $self->{heading_pos};
-    chomp $text;
-    $text =~ s/<.*?>//gmosx;
-    return $self if $text =~ m/\A$S*\z/msx;
-    my $id = 'h' . $self->hash_base36($text);
-    substr $self->{result}, $i, 0, qq{ id="$id"};
-    push @{$self->{tocinfo}}, [length $mark, $id, $text];
-    return $self;
-}
-
-sub _list_toc {
-    my($self) = @_;
-    my $toc = (ref $self)->new;
-    $toc->_put_markup('toc', 'stag');
-    $toc->{list} = [];
-    for my $info (@{$self->{tocinfo}}) {
-        $toc->_insert_list(q{*} x $info->[0]);
-        $toc->_insert_link($info->[2], "#$info->[1]", $info->[2]);
-    }
-    $toc->_end_list;
-    $toc->_put_markup('toc', 'etag');
-    return $toc;
-}
-
-# verbatims: block level nowiki "\n{{{\n...\n}}}\n"
-sub _insert_verbatim {
-    my($self, $data) = @_;
-    ($data) = $data =~ m/\A\{\{\{\n(.*?)[\x20\t]*\n\}\}\}\n\z/mosx;
-    $data =~ s/^\x20\}\}\}/\}\}\}/gmosx;
-    $self->_put_markup('verbatim', 'stag');
-    $self->put_xml($data);
-    $self->_put_markup('verbatim', 'etag');
-    return $self;
-}
-
-# lists: "* ...", "# ...", "; ...\n: ..."
-sub _start_list {
-    my($self, $data) = @_;
-    $self->{list} = [];
-    $self->_phrase_clear;
-    return $self->_insert_list($data);
-}
-
-# inline colon "; term : definition"
-sub _insert_colon {
-    my($self, $data) = @_;
-    return $self->_insert_list(q{:} x $self->{list}[0][0]);
-}
-
-sub _insert_list {
-    my($self, $data) = @_;
-    $self->_phrase_flush;
-    my($mark) = $data =~ /\A([\*\#;:]+)/mosx;
-    my $level = length $mark;
-    $mark = substr $mark, 0, 1;
-    my $list = $self->{list};
-    while ($#{$list} >= 1 && $level < $list->[0][0]) {
-        if ($list->[1][0] < $level) {
-            $list->[0][0] = $level;
-            last;
-        }
-        my $e = shift @{$list};
-        $self->_put_markup($e->[1], 'etag');
-    }
-    if (! @{$list}) {
-        $self->_put_markup($mark, 'stag');
-        unshift @{$list}, [$level, $mark];
-    }
-    elsif ($list->[0][0] < $level) {
-        my $prev = $list->[0][1];
-        if ($prev eq q{;} && ($mark eq q{*} || $mark eq q{#})) {
-            $self->_put_markup(q{;}, q{:});
-            $list->[0][1] = q{:};
-        }
-        $self->puts(q{});
-        $self->_put_markup($mark, 'stag');
-        unshift @{$list}, [$level, $mark];
-    }
-    else {
-        my $prev = $list->[0][1];
-        $self->_put_markup($prev, $mark);
-        @{$list->[0]} = ($level, $mark);
-    }
-    $self->_phrase_clear;
-    return $self;
-}
-
-sub _end_list {
-    my($self, $data) = @_;
-    $self->_phrase_flush;
-    while (my $e = shift @{$self->{list}}) {
-        $self->_put_markup($e->[1], 'etag');
-    }
-    $self->{list} = undef;
-    return $self;
-}
-
-# tables: "|=..|..|..|"
-sub _start_table {
-    my($self, $data) = @_;
-    $self->_put_markup(q{||}, 'stag');
-    ($self->{table}) = $data =~ /\A(\|=?)/mosx;
-    return $self->_start_block($self->{table});
-}
-
-sub _insert_tr {
-    my($self, $data) = @_;
-    $self->_end_block($self->{table});
-    $self->_put_markup(q{||}, q{||});
-    ($self->{table}) = $data =~ /\A(\|=?)/mosx;
-    return $self->_start_block($self->{table});
-}
-
-sub _insert_td {
-    my($self, $data) = @_;
-    $self->_end_block($self->{table});
-    ($self->{table}) = $data =~ /\A(\|=?)/mosx;
-    return $self->_start_block($self->{table});
-}
-
-sub _end_table {
-    my($self, $data) = @_;
-    $self->_end_block($self->{table});
-    $self->_put_markup(q{||}, 'etag');
-    $self->{table} = undef;
-    return $self;
-}
-
-# indented paragraphs: ": ...", "> ..."
-sub _start_indent {
-    my($self, $data) = @_;
-    $self->{indent} = 0;
-    return $self->_insert_indent($data);
-}
-
-sub _insert_indent {
-    my($self, $data) = @_;
-    my $level = $data =~ tr/>:/>:/;
-    my $step = $level - $self->{'indent'};
-    my $kind = $step > 0 ? 'stag' : 'etag';
-    for (1 .. abs $step) {
-        $self->_put_markup(q{>}, $kind);
-    }
-    $self->{'indent'} = $level;
-    return $self;
-}
-
-sub _end_indent {
-    my($self, $data) = @_;
-    return $self->_insert_indent(q{});
-}
-
-# INLINE ACTION
-# phrases: bold("**"), italic("//"),
-#   monospace("##"), superscript("^^"), subscript(",,"), underline("__")
-sub _phrase_clear {
-    my($self) = @_;
-    $self->{phrase} = {};
-    $self->{phrase_stack} = [];
-    return $self;
-}
-
-sub _insert_phrase {
-    my($self, $mark) = @_;
-    if (! $self->{phrase}{$mark}) {
-        $self->{phrase}{$mark} = 1;
-        unshift @{$self->{phrase_stack}}, $mark;
-        $self->_put_markup($mark, 'stag');
-    }
-    elsif ($self->{phrase_stack}[0] eq $mark) {
-        $self->{phrase}{$mark} = 0;
-        shift @{$self->{phrase_stack}};
-        $self->_put_markup($mark, 'etag');
-    }
-    else {
-        $self->put($mark);
-    }
-    return $self;
-}
-
-sub _phrase_flush {
-    my($self) = @_;
-    return $self if ! $self->{phrase_stack} || ! @{$self->{phrase_stack}};
-    while (my $mark = shift @{$self->{phrase_stack}}) {
-        $self->_put_markup($mark, 'etag');
-    }
-    $self->{phrase} = {};
-    return $self;
-}
-
-# break lines: "\\\\"
-sub _insert_br { return shift->_put_markup(q{\\\\}, 'tag') }
-
-# inline nowikis: "{{{...}}}"
-sub _insert_nowiki {
-    my($self, $data) = @_;
-    my($text) = $data =~ /\A... $S*(.*?)$S* ...\z/mosx;
-    $self->_put_markup('nowiki', 'stag');
-    $self->put_xml($text);
-    $self->_put_markup('nowiki', 'etag');
-    return $self;
-}
-
-# an escaped mark and an escaped character: "~..."
-sub _insert_escaped {
-    my($self, $data) = @_;
-    my $text = length $data == 1 ? $data : (substr $data, 1);
-    $self->put($text);
-    return $self;
-}
-
-# placeholders: "<<< ... >>>"
-sub _insert_placeholder {
-    my($self, $data) = @_;
-    $self->_put_markup(q{<<<}, 'stag');
-    $self->put_xml($data);
-    $self->_put_markup(q{<<<}, 'etag');
-    return $self;
-}
-
-# plugin calls: "<< ... >>"
-sub _insert_plugin {
-    my($self, $source) = @_;
-    return $self if $self->{plugin_run}; # avoid recursive calls
-    local $self->{plugin_run} = 1; ## no critic qw(LocalVars)
-    my $visitor = $self->{plugin_visitor} || $self;
-    my $plugin = $visitor->visit_plugin($source, $self);
-    if (! $plugin) {
-        return $self;
-    }
-    if ($plugin->{runtime}) {
-        ## no critic qw(Interpolation)
-        my $proc= q{$v->_build_plugin($v->visit_plugin('}
-            . $self->escape_quote($source)
-            . q{',$v))};
-        $self->put_raw(qq{';\n\$t .= $proc;\n\$t .= '});
-    }
-    else {
-        $self->put_raw($self->_build_plugin($plugin));
-    }
-    return $self;
-}
-
-sub _build_plugin {
-    my($self, $plugin) = @_;
-    return defined $plugin->{content} ? $plugin->{content}
-        : defined $plugin->{text} ? $self->escape_text($plugin->{text})
-        : defined $plugin->{xml} ? $self->escape_xml($plugin->{xml})
-        : q{};
-}
-
-# links: "[[ url | description ]]"
-sub _insert_bracketed {
-    my($self, $source) = @_;
-    if ($source =~ /\A\[\[$S*([^\|]*?)$S*(?:\|$S*(.*?)$S*)?\]\]\z/mosx) {
-        return $self->_insert_link($source, $1, defined $2 ? $2 : $1);
-    }
-    return $self->put($source);
-}
-
-# freestand links: url and CamelCased wiki words
-sub _insert_freestand {
-    my($self, $link) = @_;
-    return $self->_insert_link($link, $link, $link);
-}
-
-sub _insert_link {
-    my($self, $source, $link, $text) = @_;
-    my $visitor = $self->{link_visitor} || $self;
-    my $anchor = $visitor->visit_link($link, $text, $self);
-    if ($anchor && $self->type eq 'perl' && $anchor->{runtime}) {
-        ## no critic qw(Interpolation)
-        my $proc = q{$v->_build_a_element(}
-            . q{'} . $self->escape_quote($source) . q{',}
-            . q{$v->visit_link(}
-                . q{'} . $self->escape_quote($link) . q{',}
-                . q{'} . $self->escape_quote($text) . q{',}
-                . q{$v}
-            . q{)}
-        . q{)};
-        $self->put_raw(qq{';\n\$t .= $proc;\n\$t .= '});
-    }
-    elsif ($anchor && ($anchor->{name} || $anchor->{href})) {
-        $self->put_raw($self->_build_a_element($source, $anchor));
-    }
-    else {
-        $self->put($source);
-    }
-    return $self;
-}
-
-sub _build_a_element {
-    my($self, $source, $anchor) = @_;
-    if (! $anchor->{href} && ! $anchor->{name}) {
-        return $self->escape_xml($source);
-    }
-    my $t = q{};
-    if (exists $anchor->{before}) {
-        $t .= $anchor->{before};
-    }
-    my $attr = q{};
-    if (my $href = $anchor->{href}) {
-        $attr .= q{ href="} . $self->escape_uri($href) . q{"};
-    }
-    for my $k (qw(id name class rel rev type title)) {
-        next if ! $anchor->{$k};
-        $attr .= qq{ $k="} . $self->escape_text($anchor->{$k}) . q{"};
-    }
-    $t .= qq{<a$attr>} . $self->escape_text($anchor->{text}) . q{</a>};
-    if (exists $anchor->{after}) {
-        $t .= $anchor->{after};
-    }
-    return $t;
-}
-
-# images: "{{ url | description }}"
-sub _insert_braced {
-    my($self, $data) = @_;
-    if ($data =~ /\A\{\{$S*([^\|]*?)$S*(?:\|$S*(.*?)$S*)?\}\}\z/mosx) {
-        my($link, $title) = ($1, $2);
-        my $visitor = $self->{link_visitor} || $self;
-        my $image = $visitor->visit_image($link, $title, $self);
-        if (! $image || ! $image->{src}) {
-            return $self->put($data);
-        }
-        my $attr = q{ src="} . $self->escape_uri($image->{src}) . q{"};
-        for my $k (qw(id class alt title)) {
-            next if ! defined $image->{$k};
-            $attr .= qq{ $k="} . $self->escape_text($image->{$k}) . q{"};
-        }
-        $self->put_raw(qq{<img$attr />});
-        return $self;
-    }
-    return $self->put($data);
 }
 
 1;
@@ -962,25 +732,6 @@ XHTML result.
 
 Gets the list of headings's nesting level, its XML element id,
 and inner text.
-
-=item C<< $creolize->put($string) >>
-
-Appends string with escaping as a parsed XML TEXT.
-The utf8 flag of the string should be turned on.
-
-=item C<< $creolize->puts >>
-
-Appends end of line mark or blank.
-
-=item C<< $creolize->put_xml($string) >>
-
-Appends string with escaping as an unparsed XML TEXT.
-The utf8 flag of the string should be turned on.
-
-=item C<< $creolize->put_raw($string) >>
-
-Appends string without escapings.
-The utf8 flag of the string should be turned on.
 
 =item C<< $base36 = $creolize->hash_base36($string) >>
 
