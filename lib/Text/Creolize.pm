@@ -2,14 +2,20 @@ package Text::Creolize;
 use 5.008002;
 use strict;
 use warnings;
-use Encode qw();
-use English qw(-no_match_vars);
+use Encode ();
 
-# $Id: Creolize.pm,v 0.021 2011/11/26 15:39:18Z tociyuki Exp $
-use version; our $VERSION = '0.021';
+# $Id: Creolize.pm,v 0.022 2011/11/27 03:00:57Z tociyuki Exp $
+our $VERSION = '0.022';
 
-# Text::Creolize->new(script_name => 'http:example.net/wiki/', ...);
-# Text::Creolize->new({script_name => 'http:example.net/wiki/', ...});
+has( script_name => (is => 'rw', isa => 'Str') );
+has( static_location => (is => 'rw', isa => 'Str') );
+has( link_visitor => (is => 'rw', isa => 'Maybe[Ref]') );
+has( plugin_visitor => (is => 'rw', isa => 'Maybe[Ref]') );
+has( result => (is => 'rw', isa => 'Str') );
+has( toc => (is => 'rw', isa => 'Int') );
+has( tocinfo => (is => 'rw', isa => 'HashRef') );
+has( type => (is => 'rw', isa => 'Str') );
+
 sub new {
     my($class, @arg) = @_;
     my $self = bless {}, $class;
@@ -17,34 +23,27 @@ sub new {
     return $self;
 }
 
-sub script_name { return shift->_attr(script_name => @_) }
-sub static_location { return shift->_attr(static_location => @_) }
-sub link_visitor { return shift->_attr(link_visitor => @_) }
-sub plugin_visitor { return shift->_attr(plugin_visitor => @_) }
-sub result { return shift->_attr(result => @_) }
-sub toc { return shift->_attr(toc => @_) }
-sub tocinfo { return shift->_attr(tocinfo => @_) }
-sub type { return shift->_attr(type => @_) }
-
 sub convert {
     my($self, $wiki_source) = @_;
     $wiki_source =~ s/(?:\r\n?|\n)/\n/gmosx;
     $wiki_source =~ tr/\t/ /;
-    $self->{type} ||= 'xhtml';
-    $self->{result} = $self->_block($wiki_source);
-    if (defined $self->{toc} && @{$self->{tocinfo}} >= $self->{toc}) {
+    $self->type($self->type || 'xhtml');
+    $self->result($self->_block($wiki_source));
+    if (defined $self->toc && @{$self->tocinfo} >= $self->toc) {
         my $toc = $self->_list_toc;
-        $self->{result} = $toc . $self->{result};
+        $self->result($toc . $self->result);
     }
-    if ($self->{type} eq 'perl') {
+    if ($self->type eq 'perl') {
         ## no critic qw(Interpolation)
-        $self->{result} = "sub{\n"
+        $self->result(
+              "sub{\n"
             . "my(\$v) = \@_;\n"
             . "use utf8;\n"
             . "my \$t = '';\n"
-            . "\$t .= '" . $self->{result} . "';\n"
+            . "\$t .= '" . $self->result . "';\n"
             . "return \$t;\n"
-            . "}\n";
+            . "}\n",
+        );
     }
     return $self;
 }
@@ -52,34 +51,41 @@ sub convert {
 sub _init {
     my($self, @arg) = @_;
     %{$self} = (
-        link_visitor => undef,
-        plugin_visitor => undef,
-        markup_visitor => undef,
-        script_name => 'http://www.example.net/wiki/',
-        static_location => 'http://www.example.net/static/',
-        result => q{},
-        tocinfo => [],
-        type => 'xhtml',
+        'link_visitor' => undef,
+        'plugin_visitor' => undef,
+        'script_name' => 'http://www.example.net/wiki/',
+        'static_location' => 'http://www.example.net/static/',
+        'result' => q{},
+        'tocinfo' => [],
+        'type' => 'xhtml',
     );
     my $opt = ref $arg[0] eq 'HASH' && @arg == 1 ? $arg[0] : {@arg};
-    for my $k (qw(
-        script_name static_location
-        link_visitor plugin_visitor markup_visitor toc type
+    for my $attr (qw(
+        script_name static_location link_visitor plugin_visitor toc type
     )) {
-        next if ! exists $opt->{$k};
-        $self->{$k} = $opt->{$k};
+        next if ! exists $opt->{$attr};
+        $self->$attr($opt->{$attr});
     }
     return;
 }
 
-sub _attr {
-    my($self, $f, @arg) = @_;
-    if (@arg) {
-        $self->{$f} = $arg[0];
-    }
-    return $self->{$f};
+sub has {
+    my($attr) = @_;
+    my $pkg = caller;
+    my $accessor = sub{
+        my $self = shift @_;
+        if (@_) {
+            $self->{$attr} = $_[0];
+        }
+        return $self->{$attr};
+    };
+    no strict 'refs';
+    *{"${pkg}::${attr}"} = $accessor;
+    return;
 }
 
+## no critic qw(EscapedMetacharacters EnumeratedClasses ComplexRegexes)
+## no critic qw(PunctuationVars)
 my @BASE36 = ('0' .. '9', 'a' .. 'z');
 my %XML_SPECIAL = (
     q{&} => q{&amp;}, q{<} => q{&lt;}, q{>} => q{&gt;},
@@ -90,8 +96,8 @@ my $S = qr{[\x20\t]}msx;
 
 my %MARKUP = (
     '<hr>' => '<hr />', '</hr>' => "\n",
-    '<blockquote>' => qq{<div style="margin-left:2em">\n},
-    '</blockquote>' => "</div>\n", 
+    '<indented>' => qq{<div style="margin-left:2em">\n},
+    '</indented>' => "</div>\n", 
     '<table>' => "<table>\n<tr>", '</table>' => "</tr>\n</table>\n",
     '</table><table>' => "</tr>\n<tr>",
     '<ul>' => "<ul>\n<li>", '</ul>' => "</li>\n</ul>\n",
@@ -102,7 +108,7 @@ my %MARKUP = (
     '</dl><dl>' => "</dd>\n<dt>",
     '<**>' => '<strong>',   '</**>' => '</strong>',
     '<//>' => '<em>',       '<///>' => '</em>',
-    '<##>' => '<tt>',     '</##>' => '</tt>',
+    '<##>' => '<tt>',       '</##>' => '</tt>',
     '<^^>' => '<sup>',      '</^^>' => '</sup>',
     '<,,>' => '<sub>',      '</,,>' => '</sub>',
     '<__>' => q{<span class="underline">}, '</__>' => q{</span>},
@@ -123,16 +129,58 @@ my $INLINE_TERM = qr{
 }msx;
 my $TILD_ESCAPE = qr{~ (?: $INLINE_TERM | =+ | [^\n ]?)}msx;
 my $INLINE_SKIP = qr{$INLINE_TERM | $TILD_ESCAPE}msx;
-my $BLOCKQUOTE = qr{
-    .*?\n (?=\{\{\{\n
-    |[ ]*(?:[\n=|>;:]|-{4,}[ ]*\n|[*](?![*])|[*]{3,}|\#(?!\#)|\#{3,}) )
-}msx;
 
 my @BLOCK_SIGN = (
     undef, undef,
-    'pre', '', 'hr', 'heading', 'heading', 'table', 'dl',
-    'blockquote', 'ul', 'ol',
+    'pre', q{}, 'hr', 'heading', 'heading', 'table', 'dl',
+    'indented', 'ul', 'ol',
 );
+my $INDENTED = qr{
+    .*?\n (?=\{\{\{\n
+    |[ ]*(?:[\n=|>;:]|-{4,}[ ]*\n|[*](?![*])|[*]{3,}|\#(?!\#)|\#{3,}) )
+}msx;
+my $PARAGRAPH_BLOCK = qr{
+    (.*?)
+    ^(?: \{\{\{\n (.*?)\n \}\}\}\n
+    |   [ ]*
+        (?: () \n
+        |   () -{4,} [ ]* \n
+        |   (={1,6})=* [ ]* (.*?) [ ]* (?:=+[ ]*)? \n
+        |   ([|].*?) [ ]* (?:(?<!~)[|] [ ]*)? \n
+        |   ([;]+) [ ]*
+        |   ([:>] $INDENTED (?:[ ]* [:>] $INDENTED)*)
+        |   (?:([*](?![*])|[*]{3,}) | (\#(?!\#)|\#{3,})) [ ]*
+        )
+    )
+}msx;
+my $DEFINITIONLIST_BLOCK = qr{
+    (.*?)
+    ^(?: \{\{\{\n (.*?)\n \}\}\}\n
+    |   [ ]*
+        (?: () \n
+        |   () -{4,} [ ]* \n
+        |   (={1,6})=* [ ]* (.*?) [ ]* (?:=+[ ]*)? \n
+        |   ([|].*?) [ ]* (?:(?<!~)[|] [ ]*)? \n
+        |   ([;]+) [ ]*
+        |   ([>] $INDENTED (?:[ ]* [:>] $INDENTED)*)
+        |   (?:([*](?![*])|[*]{3,}) | (\#(?!\#)|\#{3,})) [ ]*
+        )
+    )
+}msx;
+my $MARKEDLIST_BLOCK = qr{
+    (.*?)
+    ^(?: \{\{\{\n (.*?)\n \}\}\}\n
+    |   [ ]*
+        (?: () \n
+        |   () -{4,} [ ]* \n
+        |   (={1,6})=* [ ]* (.*?) [ ]* (?:=+[ ]*)? \n
+        |   ([|].*?) [ ]* (?:(?<!~)[|] [ ]*)? \n
+        |   ([;]+) [ ]*
+        |   ([:>] $INDENTED (?:[ ]* [:>] $INDENTED)*)
+        |   (?:([*]+)|(\#+)) [ ]*
+        )
+    )
+}msx;
 
 sub _block {
     my($self, $src) = @_;
@@ -142,58 +190,10 @@ sub _block {
     my $sign1 = 'p';
     while (not $src =~ m{\G\z}msx) {
         my($data1, $sign, $mark, $data);
-        if ($sign1 eq 'p' && $src =~ m{\G
-            (.*?)
-            ^(?: \{\{\{\n (.*?)\n \}\}\}\n
-            |   [ ]*
-                (?: () \n
-                |   () -{4,} [ ]* \n
-                |   (={1,6})=* [ ]* (.*?) [ ]* (?:=+[ ]*)? \n
-                |   ([|].*?) [ ]* (?:(?<!~)[|] [ ]*)? \n
-                |   ([;]+) [ ]*
-                |   ([:>] $BLOCKQUOTE (?:[ ]* [:>] $BLOCKQUOTE)*)
-                |   (?:([*](?![*])|[*]{3,}) | (\#(?!\#)|\#{3,})) [ ]*
-                )
-            )
-        }cgmosx) {
-            $data1 = $1;
-            $sign = $BLOCK_SIGN[$#-];
-            $mark = $5 || $8 || $10 || $11 || q{};
-            $data = $+;
-        }
-        elsif ($sign1 eq 'dl' && $src =~ m{\G
-            (.*?)
-            ^(?: \{\{\{\n (.*?)\n \}\}\}\n
-            |   [ ]*
-                (?: () \n
-                |   () -{4,} [ ]* \n
-                |   (={1,6})=* [ ]* (.*?) [ ]* (?:=+[ ]*)? \n
-                |   ([|].*?) [ ]* (?:(?<!~)[|] [ ]*)? \n
-                |   ([;]+) [ ]*
-                |   ([>] $BLOCKQUOTE (?:[ ]* [:>] $BLOCKQUOTE)*)
-                |   (?:([*](?![*])|[*]{3,}) | (\#(?!\#)|\#{3,})) [ ]*
-                )
-            )
-        }cgmosx) {
-            $data1 = $1;
-            $sign = $BLOCK_SIGN[$#-];
-            $mark = $5 || $8 || $10 || $11 || q{};
-            $data = $+;
-        }
-        elsif ($src =~ m{\G
-            (.*?)
-            ^(?: \{\{\{\n (.*?)\n \}\}\}\n
-            |   [ ]*
-                (?: () \n
-                |   () -{4,} [ ]* \n
-                |   (={1,6})=* [ ]* (.*?) [ ]* (?:=+[ ]*)? \n
-                |   ([|].*?) [ ]* (?:(?<!~)[|] [ ]*)? \n
-                |   ([;]+) [ ]*
-                |   ([:>] $BLOCKQUOTE (?:[ ]* [:>] $BLOCKQUOTE)*)
-                |   (?:([*]+)|(\#+)) [ ]*
-                )
-            )
-        }cgmosx) {
+        if (   $sign1 eq 'p'  && $src =~ m/\G$PARAGRAPH_BLOCK/cgmosx
+            || $sign1 eq 'dl' && $src =~ m/\G$DEFINITIONLIST_BLOCK/cgmosx
+            ||                   $src =~ m/\G$MARKEDLIST_BLOCK/cgmosx
+        ) {
             $data1 = $1;
             $sign = $BLOCK_SIGN[$#-];
             $mark = $5 || $8 || $10 || $11 || q{};
@@ -202,7 +202,7 @@ sub _block {
         if ($data1 ne q{}) {
             chomp $data1;
             if ($sign1 eq 'p') {
-                $self->_emit_block($c, 'p', '');
+                $self->_emit_block($c, 'p', q{});
             }
             if ($sign1 eq 'dl') {
                 $self->_definition_list($c, $data1);
@@ -224,7 +224,7 @@ sub _block {
         elsif ($sign eq 'table') {
             $self->_table_row($c, $data);
         }
-        elsif ($sign eq 'blockquote') {
+        elsif ($sign eq 'indented') {
             $data =~ s/^[ ]*[:>][ ]?//gmsx;
             $c->{'result'} .= $self->_block($data);
         }
@@ -237,7 +237,7 @@ sub _block {
 
 sub _heading {
     my($self, $c, $mark, $data) = @_;
-    $self->_emit_block($c, '', '');
+    $self->_emit_block($c, q{}, q{});
     my $level = length $mark;
     my $inline = $self->_inline($data);
     my $attr = q{};
@@ -285,8 +285,8 @@ sub _definition_list {
     my($dt, $dd) = $data =~ m{\A
         ([^:~\[\{]*? (?:$INLINE_SKIP [^:~\[\{]*)*?) (?:[\n ]*[:][ ]*(.*))?
     \z}msx;
-    $dd = defined $dd ? $dd : q{};
-    $c->{'result'} .= $self->_inline($dt) . "</dt>\n<dd>" . $self->_inline($dd);
+    $c->{'result'} .= $self->_inline($dt)
+        . "</dt>\n<dd>" . $self->_inline(defined $dd ? $dd : q{});
     return $c;
 }
 
@@ -296,7 +296,7 @@ sub _emit_block {
     my $result = q{};
     my $code = $c->{'code'};
     if ($level > 0 && @{$code} && $code->[0][0] == 0) {
-        $self->_emit_block($c, '', '');
+        $self->_emit_block($c, q{}, q{});
     }
     while ($#{$code} >= 1 && $level < $code->[0][0]) {
         if ($code->[1][0] < $level) {
@@ -385,6 +385,10 @@ sub _inline {
             $self->_insert_braced($c, $text, $src, $alt);
             next;
         }
+        elsif ($type == $PLUGIN) {
+            $self->_insert_plugin($c, $text);
+            next;
+        }
         elsif ($type == $BR) {
             $c->{'result'} .= qq{<br />\n};
             next;
@@ -404,16 +408,16 @@ sub _inline {
             }
         }
         elsif ($type == $PLACEHOLDER) {
-            $c->{'result'} .= $MARKUP{'<placeholder>'} . $self->escape_xml($text) . $MARKUP{'</placeholder>'};
-            next;
-        }
-        elsif ($type == $PLUGIN) {
-            $self->_insert_plugin($c, $text);
+            $c->{'result'} .= $MARKUP{'<placeholder>'}
+                . $self->escape_xml($text)
+                . $MARKUP{'</placeholder>'};
             next;
         }
         elsif ($type == $NOWIKI) {
             my($data) = $text =~ m/\A... [ ]* (.*?) [ ]* ...\z/mosx;
-            $c->{'result'} .= $MARKUP{'<nowiki>'} . $self->escape_xml($data) . $MARKUP{'</nowiki>'};
+            $c->{'result'} .= $MARKUP{'<nowiki>'}
+                . $self->escape_xml($data)
+                . $MARKUP{'</nowiki>'};
             next;
         }
         elsif ($type == $TILD && $text ne q{~}) {
@@ -427,9 +431,9 @@ sub _inline {
 
 sub _insert_link {
     my($self, $c, $source, $link, $text) = @_;
-    my $visitor = $self->{link_visitor} || $self;
+    my $visitor = $self->{'link_visitor'} || $self;
     my $anchor = $visitor->visit_link($link, $text, $self);
-    if ($anchor && $self->type eq 'perl' && $anchor->{runtime}) {
+    if ($anchor && $self->type eq 'perl' && $anchor->{'runtime'}) {
         ## no critic qw(Interpolation)
         my $proc = q{$v->_build_anchor(}
             . q{'} . $self->escape_quote($source) . q{',}
@@ -441,7 +445,7 @@ sub _insert_link {
         . q{)};
         $c->{'result'} .= qq{';\n\$t .= $proc;\n\$t .= '};
     }
-    elsif ($anchor && ($anchor->{name} || $anchor->{href})) {
+    elsif ($anchor && ($anchor->{'name'} || $anchor->{'href'})) {
         $c->{'result'} .= $self->_build_anchor($source, $anchor);
     }
     else {
@@ -452,37 +456,37 @@ sub _insert_link {
 
 sub _build_anchor {
     my($self, $source, $anchor) = @_;
-    if (! $anchor->{href} && ! $anchor->{name}) {
+    if (! $anchor->{'href'} && ! $anchor->{'name'}) {
         return $self->escape_xml($source);
     }
     my $t = q{};
-    if (exists $anchor->{before}) {
-        $t .= $anchor->{before};
+    if (exists $anchor->{'before'}) {
+        $t .= $anchor->{'before'};
     }
     my $attr = q{};
-    if (my $href = $anchor->{href}) {
+    if (my $href = $anchor->{'href'}) {
         $attr .= q{ href="} . $self->escape_uri($href) . q{"};
     }
     for my $k (qw(id name class rel rev type title)) {
         next if ! $anchor->{$k};
         $attr .= qq{ $k="} . $self->escape_text($anchor->{$k}) . q{"};
     }
-    $t .= qq{<a$attr>} . $self->escape_text($anchor->{text}) . q{</a>};
-    if (exists $anchor->{after}) {
-        $t .= $anchor->{after};
+    $t .= qq{<a$attr>} . $self->escape_text($anchor->{'text'}) . q{</a>};
+    if (exists $anchor->{'after'}) {
+        $t .= $anchor->{'after'};
     }
     return $t;
 }
 
 sub _insert_braced {
     my($self, $c, $text, $link, $title) = @_;
-    my $visitor = $self->{link_visitor} || $self;
+    my $visitor = $self->{'link_visitor'} || $self;
     my $image = $visitor->visit_image($link, $title, $self);
-    if (! $image || ! $image->{src}) {
+    if (! $image || ! $image->{'src'}) {
         $c->{'result'} .= $self->escape_text($text);
         return $self;
     }
-    my $attr = q{ src="} . $self->escape_uri($image->{src}) . q{"};
+    my $attr = q{ src="} . $self->escape_uri($image->{'src'}) . q{"};
     for my $k (qw(id class alt title)) {
         next if ! defined $image->{$k};
         $attr .= qq{ $k="} . $self->escape_text($image->{$k}) . q{"};
@@ -493,14 +497,14 @@ sub _insert_braced {
 
 sub _insert_plugin {
     my($self, $c, $source) = @_;
-    return $self if $self->{plugin_run}; # avoid recursive calls
-    local $self->{plugin_run} = 1; ## no critic qw(LocalVars)
-    my $visitor = $self->{plugin_visitor} || $self;
+    return $self if $self->{'plugin_run'}; # avoid recursive calls
+    local $self->{'plugin_run'} = 1; ## no critic qw(LocalVars)
+    my $visitor = $self->{'plugin_visitor'} || $self;
     my $plugin = $visitor->visit_plugin($source, $self);
     if (! $plugin) {
         return $self;
     }
-    if ($plugin->{runtime}) {
+    if ($plugin->{'runtime'}) {
         ## no critic qw(Interpolation)
         my $proc= q{$v->_build_plugin($v->visit_plugin('}
             . $self->escape_quote($source)
@@ -515,13 +519,13 @@ sub _insert_plugin {
 
 sub _build_plugin {
     my($self, $plugin) = @_;
-    return defined $plugin->{content} ? $plugin->{content}
-        : defined $plugin->{text} ? $self->escape_text($plugin->{text})
-        : defined $plugin->{xml} ? $self->escape_xml($plugin->{xml})
+    return defined $plugin->{'content'} ? $plugin->{'content'}
+        : defined $plugin->{'text'} ? $self->escape_text($plugin->{'text'})
+        : defined $plugin->{'xml'} ? $self->escape_xml($plugin->{'xml'})
         : q{};
 }
 
-# VISITORS
+# DEFAULT VISITORS
 # $hash_anchor = $creolize->link_visitor->visit_link($link, $title, $creolize);
 sub visit_link {
     my($self, $link, $text, $builder) = @_;
@@ -529,12 +533,12 @@ sub visit_link {
     return $anchor if $link =~ /script:/imosx;
     if ($link !~ m{\A(?:(?:https?|ftps?)://|\#)}mosx) {
         if ($builder->type eq 'perl') {
-            $anchor->{runtime} = 'yes';
+            $anchor->{'runtime'} = 'yes';
         }
         $link = $builder->script_name . $link;
     }
-    $anchor->{href} = $link;
-    $anchor->{text} = defined $text ? $text : $link;
+    $anchor->{'href'} = $link;
+    $anchor->{'text'} = defined $text ? $text : $link;
     return $anchor;
 }
 
@@ -545,8 +549,8 @@ sub visit_image {
     if ($link !~ m{\Ahttps?://}mosx) {
         $link = $builder->static_location . $link;
     }
-    $image->{src} = $link;
-    $image->{alt} = defined $title ? $title : q{};
+    $image->{'src'} = $link;
+    $image->{'alt'} = defined $title ? $title : q{};
     return $image;
 }
 
@@ -555,9 +559,9 @@ sub visit_plugin {
     my($self, $data, $builder) = @_;
     my $plugin = {};
     if ($builder->type eq 'perl') {
-        $plugin->{runtime} = 'yes';
+        $plugin->{'runtime'} = 'yes';
     }
-    $plugin->{text} = q{};
+    $plugin->{'text'} = q{};
     return $plugin;
 }
 
@@ -608,8 +612,7 @@ sub hash_base36 {
     if (utf8::is_utf8($text)) {
         $text = Encode::encode_utf8($text);
     }
-    my $x = _murmurhash_pp($text);
-    return _hex_base36(sprintf '%08x', $x);
+    return _hex_base36(sprintf '%08x', _murmurhash_pp($text));
 }
 
 sub _hex_base36 {
@@ -660,7 +663,7 @@ Text::Creolize - A practical converter for WikiCreole to XHTML.
 
 =head1 VERSION
 
-0.021
+0.022
 
 =head1 SYNOPSIS
 
@@ -822,6 +825,10 @@ Encode URI with parcent encoded for a name part.
 =item C<< $string = $creolize->escape_quote($string) >>
 
 Escape single quote with a backslash mark in the given string.
+
+=item C<< has >>
+
+moose-like attribute decralator.
 
 =back
 
